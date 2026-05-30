@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>자율주행 충돌 탐지 시뮬레이터</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:'Noto Sans KR','Segoe UI',sans-serif;
+      background:#070b18; color:#8aaccc;
+      display:flex; height:100vh; overflow:hidden;
+    }
+
+    /* ══════════════════════════════════════════
+       PANEL
+    ══════════════════════════════════════════ */
+    #panel {
+      width:320px; min-width:320px;
+      background:linear-gradient(175deg,#090e1f 0%,#060912 100%);
+      border-right:1px solid rgba(42,122,222,.13);
+      box-shadow:4px 0 40px rgba(0,0,0,.8);
+      display:flex; flex-direction:column; overflow-y:auto;
+      scrollbar-width:thin; scrollbar-color:rgba(42,122,222,.18) transparent;
+    }
+    #panel::-webkit-scrollbar { width:3px; }
+    #panel::-webkit-scrollbar-thumb { background:rgba(42,122,222,.2); border-radius:2px; }
+
+    /* ── Header ───────────────────────── */
+    .ph {
+      padding:22px 18px 18px;
+      background:linear-gradient(150deg,#0d1e3a 0%,#08112a 50%,#060c1e 100%);
+      border-bottom:1px solid rgba(42,122,222,.15);
+      text-align:center; position:relative; overflow:hidden; flex-shrink:0;
+    }
+    /* top glow strip */
+    .ph::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent 0%,#1a6ade 20%,#00e5ff 50%,#1a6ade 80%,transparent 100%);
+      box-shadow:0 0 16px 2px rgba(0,200,255,.25);
+    }
+    /* radial glow */
+    .ph::after {
+      content:''; position:absolute; inset:0;
+      background:radial-gradient(ellipse 90% 70% at 50% -10%,rgba(42,122,222,.1),transparent 65%);
+      pointer-events:none;
+    }
+    .ph-badge {
+      display:inline-flex; align-items:center; gap:5px;
+      background:rgba(42,122,222,.1); border:1px solid rgba(42,122,222,.2);
+      border-radius:20px; padding:3px 10px; margin-bottom:10px;
+      font-size:11px; font-weight:600; letter-spacing:1.5px;
+      color:rgba(42,122,222,.8); text-transform:uppercase;
+    }
+    .ph h1 {
+      font-size:19px; font-weight:700; color:#6ec6ff; letter-spacing:.6px;
+      text-shadow:0 0 24px rgba(110,198,255,.35);
+    }
+    .ph p { font-size:12px; color:#4a7a9a; margin-top:5px; letter-spacing:.3px; }
+
+    /* ── Section ─────────────────────── */
+    .sec { padding:14px 15px 12px; border-bottom:1px solid rgba(255,255,255,.03); }
+
+    .sec-t {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:2.5px; color:#4a90cc;
+      margin-bottom:13px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .sec-t::before {
+      content:''; width:3px; height:11px; border-radius:2px; flex-shrink:0;
+      background:linear-gradient(180deg,#2a7ade,#00e0ff);
+      box-shadow:0 0 6px rgba(0,200,255,.4);
+    }
+
+    /* ── Control group ─────────────────── */
+    .ctrl { margin-bottom:14px; }
+    .ctrl:last-child { margin-bottom:0; }
+    .ctrl-label {
+      font-size:14px; color:#6aa0c0; margin-bottom:7px; display:block;
+      font-weight:400; letter-spacing:.1px;
+    }
+    .ctrl-row { display:flex; align-items:center; gap:8px; }
+
+    /* Slider with JS-driven fill via --pct */
+    input[type=range] {
+      flex:1; height:4px; -webkit-appearance:none;
+      background:linear-gradient(90deg,
+        rgba(42,122,222,.8) 0%,
+        rgba(42,122,222,.8) var(--pct,0%),
+        rgba(14,28,52,.9) var(--pct,0%),
+        rgba(14,28,52,.9) 100%);
+      border-radius:3px; outline:none; cursor:pointer; min-width:0;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance:none; width:16px; height:16px;
+      background:#fff; border-radius:50%; cursor:pointer;
+      border:2.5px solid #2a7ade;
+      box-shadow:0 0 0 3px rgba(42,122,222,.2), 0 0 10px rgba(42,122,222,.45);
+      transition:transform .12s, box-shadow .12s;
+    }
+    input[type=range]:hover::-webkit-slider-thumb {
+      transform:scale(1.15);
+      box-shadow:0 0 0 4px rgba(42,122,222,.3), 0 0 18px rgba(42,122,222,.7);
+    }
+    input[type=range]:active::-webkit-slider-thumb { transform:scale(1.05); }
+
+    /* Number input */
+    input[type=number] {
+      width:66px; flex-shrink:0;
+      background:rgba(6,14,30,.9); border:1px solid rgba(42,122,222,.2);
+      border-radius:7px; color:#7ad4ff;
+      font-family:'Courier New',monospace; font-size:14px; font-weight:700;
+      padding:5px 8px; text-align:right; outline:none; transition:all .15s;
+      -moz-appearance:textfield;
+    }
+    input[type=number]:focus {
+      border-color:rgba(42,122,222,.55);
+      box-shadow:0 0 0 2px rgba(42,122,222,.12), 0 0 8px rgba(42,122,222,.15);
+    }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { opacity:.15; }
+
+    .range-lbl {
+      display:flex; justify-content:space-between; font-size:11px;
+      color:rgba(100,180,255,.55); margin-top:3px; padding-right:74px;
+      letter-spacing:.2px;
+    }
+
+    /* ── Buttons ──────────────────────── */
+    .btn-row { display:flex; gap:8px; padding:12px 15px; }
+
+    .btn {
+      padding:12px 10px; border:none; border-radius:8px;
+      font-family:inherit; font-size:15px; font-weight:600;
+      cursor:pointer; transition:all .2s; letter-spacing:.3px;
+      position:relative; overflow:hidden;
+    }
+
+    /* Run button — full width */
+    .btn-run {
+      flex:1;
+      background:linear-gradient(135deg,#0c3d20 0%,#072818 100%);
+      color:#3dffaa; border:1px solid rgba(61,255,170,.22);
+      box-shadow:0 3px 20px rgba(0,0,0,.5),
+                 inset 0 1px 0 rgba(61,255,170,.08);
+    }
+    .btn-run::before {
+      content:''; position:absolute; inset:0;
+      background:radial-gradient(circle at 50% -10%,rgba(61,255,170,.07),transparent 55%);
+    }
+    .btn-run:hover {
+      filter:brightness(1.18);
+      border-color:rgba(61,255,170,.38);
+      box-shadow:0 0 22px rgba(61,255,170,.14), inset 0 1px 0 rgba(61,255,170,.12);
+    }
+    .btn-run.active {
+      background:linear-gradient(135deg,#481010 0%,#300808 100%);
+      color:#ff7878; border-color:rgba(255,100,100,.28);
+      animation:runGlow 1.8s ease-in-out infinite;
+    }
+    @keyframes runGlow {
+      0%,100% { box-shadow:0 0 10px rgba(255,60,60,.12); }
+      50%      { box-shadow:0 0 26px rgba(255,60,60,.45), 0 0 50px rgba(255,60,60,.1); }
+    }
+
+    /* Reset — icon only */
+    .btn-rst {
+      flex:0 0 44px;
+      background:rgba(8,14,26,.7); color:#4a7aaa;
+      border:1px solid rgba(255,255,255,.06);
+      font-size:18px; padding:12px 6px;
+    }
+    .btn-rst:hover { color:#5aabf0; border-color:rgba(42,122,222,.2); }
+
+    /* ── Camera toggle ─────────────────── */
+    .cam-row { display:flex; gap:4px; padding:0 15px 13px; }
+    .btn-cam {
+      flex:1; padding:7px 4px; font-size:13px; font-weight:500;
+      border:1px solid rgba(255,255,255,.05); border-radius:7px;
+      background:rgba(7,13,24,.7); color:#4a7a9a;
+      cursor:pointer; transition:all .15s; letter-spacing:.2px;
+    }
+    .btn-cam:hover { color:#4a7aaa; border-color:rgba(42,122,222,.15); }
+    .btn-cam.active {
+      background:rgba(42,122,222,.11); color:#5aabf0;
+      border-color:rgba(42,122,222,.3);
+      box-shadow:inset 0 0 14px rgba(42,122,222,.07);
+    }
+
+    /* ── Status items ──────────────────── */
+    .stat-grid { display:flex; flex-direction:column; gap:4px; }
+    .stat-item {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:6px 10px; border-radius:7px;
+      background:rgba(8,16,34,.55); border:1px solid rgba(255,255,255,.03);
+      font-size:13px; transition:background .15s;
+    }
+    .stat-lbl { color:#5a88aa; font-size:12.5px; }
+    .stat-val {
+      color:#4a8abf; font-family:'Courier New',monospace;
+      font-size:13px; font-weight:700;
+    }
+    .stat-val.evade  { color:#ff8c00; text-shadow:0 0 8px rgba(255,140,0,.3); }
+    .stat-val.pd     { color:#00d4ff; text-shadow:0 0 8px rgba(0,212,255,.25); }
+    .stat-val.lane   { color:#b060ff; text-shadow:0 0 8px rgba(176,96,255,.25); }
+    .stat-val.done   { color:#3dffaa; text-shadow:0 0 8px rgba(61,255,170,.25); }
+    .stat-val.danger { color:#ff4444; text-shadow:0 0 8px rgba(255,68,68,.3); }
+    .stat-val.idle   { color:#3a6080; }
+
+    /* ── Crash overlay ─────────────────── */
+    #crash-overlay {
+      position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(80,0,0,0); pointer-events:none; z-index:10;
+    }
+    #crash-overlay.show { display:flex; animation:crashFlash .15s ease-in-out 4; }
+    #crash-overlay .crash-txt {
+      font-size:64px; font-weight:900; color:#ff1a1a;
+      text-shadow:0 0 40px #ff0000, 0 0 80px #ff4400;
+      letter-spacing:4px;
+      animation:crashPop .4s cubic-bezier(.2,1.6,.4,1) forwards;
+    }
+    @keyframes crashFlash {
+      0%,100% { background:rgba(80,0,0,0); }
+      50%      { background:rgba(180,0,0,.35); }
+    }
+    @keyframes crashPop {
+      0%  { transform:scale(.2); opacity:0; }
+      60% { transform:scale(1.15); opacity:1; }
+      100%{ transform:scale(1); opacity:1; }
+    }
+
+    /* ── Success overlay ───────────────── */
+    #success-overlay {
+      position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,60,20,0); pointer-events:none; z-index:10;
+    }
+    #success-overlay.show { display:flex; animation:successFlash .2s ease-in-out 3; }
+    .success-txt {
+      font-size:64px; font-weight:900; color:#3dffaa;
+      text-shadow:0 0 40px #00ff88, 0 0 80px #00ffaa;
+      letter-spacing:4px;
+      animation:crashPop .4s cubic-bezier(.2,1.6,.4,1) forwards;
+    }
+    @keyframes successFlash {
+      0%,100% { background:rgba(0,60,20,0); }
+      50%      { background:rgba(0,120,50,.22); }
+    }
+
+    /* ── btn-run hidden after end state ── */
+    .btn-run.hidden { display:none; }
+
+    /* ── Viewport ──────────────────────── */
+    #viewport { flex:1; position:relative; overflow:hidden; }
+    #three-canvas { width:100%; height:100%; display:block; }
+
+    /* ── Steering wheel HUD ────────────── */
+    #wheel-hud {
+      position:absolute; top:14px; left:14px; z-index:5;
+      background:rgba(6,10,22,.88); border:1px solid rgba(42,122,222,.14);
+      border-radius:12px; padding:10px;
+      backdrop-filter:blur(10px);
+      box-shadow:0 4px 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+    #wheel-hud .wh-label {
+      text-align:center; font-size:10px; color:#5a88aa;
+      letter-spacing:1px; margin-top:5px; font-family:'Noto Sans KR',sans-serif;
+    }
+    #wheel-canvas { display:block; }
+
+    /* ── HUD overlay ───────────────────── */
+    #hud {
+      position:absolute; top:14px; right:14px;
+      background:rgba(6,10,22,.88); border:1px solid rgba(42,122,222,.14);
+      border-radius:10px; padding:14px 18px; min-width:196px;
+      backdrop-filter:blur(10px);
+      box-shadow:0 4px 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
+      font-size:13px;
+    }
+    .hr { display:flex; justify-content:space-between; gap:12px; margin-bottom:5px; }
+    .hk { color:#5a88aa; font-size:12px; }
+    .hv { color:#6aacee; font-family:monospace; font-size:12px; font-weight:700; }
+    .hv.safe   { color:#3dffaa; }
+    .hv.danger { color:#ff5555; }
+    .hv.evade  { color:#ff8c00; }
+    .hv.pd     { color:#00d4ff; }
+    .hv.lane   { color:#b060ff; }
+    .hv.done   { color:#3dffaa; }
+    #hud hr { border:none; border-top:1px solid rgba(42,122,222,.1); margin:7px 0; }
+    #spd-arc { display:block; margin:8px auto 0; }
+
+    /* PD mini bar */
+    .pd-bar-wrap { margin-top:7px; }
+    .pd-bar-label { font-size:11px; color:#5a88aa; margin-bottom:3px; display:flex; justify-content:space-between; }
+    .pd-bar-track { height:4px; background:rgba(10,24,40,.9); border-radius:2px; position:relative; overflow:visible; }
+    .pd-bar-fill  { height:100%; border-radius:2px; transition:width .05s,background .1s; position:absolute; top:0; }
+    .pd-bar-center{ position:absolute; top:-1px; left:50%; width:1px; height:6px; background:rgba(42,122,222,.25); }
+
+    /* ── Legend ────────────────────────── */
+    #legend {
+      position:absolute; bottom:14px; left:14px;
+      background:rgba(6,10,22,.88); border:1px solid rgba(42,122,222,.1);
+      border-radius:10px; padding:11px 14px;
+      backdrop-filter:blur(10px);
+      box-shadow:0 4px 20px rgba(0,0,0,.5);
+      font-size:12px;
+    }
+    .leg-r  { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+    .leg-r:last-child { margin-bottom:0; }
+    .leg-ln { width:14px; height:3px; border-radius:2px; flex-shrink:0; }
+    .leg-bx { width:11px; height:7px; border-radius:2px; flex-shrink:0; }
+    .leg-ri { width:11px; height:11px; border-radius:50%; border:1px solid currentColor; flex-shrink:0; }
+    .leg-tx { color:#5a88aa; }
+
+    /* ── Phase bar ─────────────────────── */
+    #phase-bar {
+      position:absolute; bottom:14px; right:14px;
+      background:rgba(6,10,22,.88); border:1px solid rgba(42,122,222,.1);
+      border-radius:10px; padding:12px 16px; min-width:180px;
+      backdrop-filter:blur(10px);
+      box-shadow:0 4px 20px rgba(0,0,0,.5);
+      font-size:12px;
+    }
+    #phase-bar .pb-title {
+      font-size:9px; font-weight:700; color:#4a90cc;
+      text-transform:uppercase; letter-spacing:2px; margin-bottom:9px;
+    }
+    .pb-row  { display:flex; justify-content:space-between; margin-bottom:4px; }
+    .pb-k    { color:#5a88aa; font-size:11px; }
+    .pb-v    { font-family:monospace; color:#5a9ace; font-size:11px; font-weight:700; }
+
+    /* ── Loading ────────────────────────── */
+    #loading {
+      position:absolute; inset:0; background:#070b18;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      z-index:100; transition:opacity .5s;
+    }
+    #loading h2 { color:#5aabf0; font-size:20px; margin-bottom:10px; }
+    #loading p  { color:#1f3a5a; font-size:14px; }
+    .spinner {
+      width:38px; height:38px; border:3px solid rgba(42,122,222,.15);
+      border-top-color:#2a7ade; border-radius:50%;
+      animation:spin .8s linear infinite; margin-bottom:14px;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div><h2>시뮬레이터 초기화</h2><p>기구학적 자전거 모델 · CCD · PD 제어 로딩 중</p></div>
+
+<!-- ══ Control Panel ══════════════════════════ -->
+<div id="panel">
+  <div class="ph">
+    <div class="ph-badge">시뮬레이터</div>
+    <h1>자율주행 시뮬레이터</h1>
+    <p>기구학적 자전거 모델 + CCD + PD 복귀 제어</p>
+  </div>
+
+  <!-- 주행 파라미터 -->
+  <div class="sec">
+    <div class="sec-t">주행 파라미터</div>
+
+    <div class="ctrl">
+      <span class="ctrl-label">핸들 조향각</span>
+      <div class="ctrl-row">
+        <input type="range"  id="s-steer" min="-90" max="90" value="0" step="1"/>
+        <input type="number" id="n-steer" min="-90" max="90" value="0" step="1"/>
+      </div>
+      <div class="range-lbl"><span>−90°</span><span>0°</span><span>+90°</span></div>
+    </div>
+
+    <div class="ctrl">
+      <span class="ctrl-label">회피 기동 시작점</span>
+      <div class="ctrl-row">
+        <input type="range"  id="s-dist" min="5" max="120" value="30" step="1"/>
+        <input type="number" id="n-dist" min="5" max="120" value="30" step="1"/>
+      </div>
+      <div class="range-lbl"><span>5m</span><span>60m</span><span>120m</span></div>
+    </div>
+
+    <div class="ctrl">
+      <span class="ctrl-label">속도 v</span>
+      <div class="ctrl-row">
+        <input type="range"  id="s-speed" min="0" max="120" value="40" step="5"/>
+        <input type="number" id="n-speed" min="0" max="120" value="40" step="5"/>
+      </div>
+      <div class="range-lbl"><span>0</span><span>60</span><span>120 km/h</span></div>
+    </div>
+  </div>
+
+  <!-- PD 복귀 제어 (자동 — 슬라이더 없음) -->
+
+  <!-- 실행 -->
+  <div class="btn-row">
+    <button class="btn btn-run" id="btn-run" onclick="toggleRun()">▶ 실행</button>
+    <button class="btn btn-rst"               onclick="resetSim()">↺</button>
+  </div>
+
+  <!-- 카메라 -->
+  <div class="sec" style="padding-bottom:6px;">
+    <div class="sec-t">카메라 모드</div>
+    <div class="cam-row">
+      <button class="btn-cam active" id="cam-follow" onclick="setCamera('follow')">추적</button>
+      <button class="btn-cam"        id="cam-top"    onclick="setCamera('top')">조감도</button>
+      <button class="btn-cam"        id="cam-free"   onclick="setCamera('free')">자유</button>
+    </div>
+  </div>
+
+  <!-- 상태 -->
+  <div class="sec" style="flex:1;">
+    <div class="sec-t">주행 상태</div>
+    <div class="stat-grid">
+      <div class="stat-item"><span class="stat-lbl">경과 시간</span> <span class="stat-val" id="st-time">0.00 s</span></div>
+      <div class="stat-item"><span class="stat-lbl">이동 거리</span> <span class="stat-val" id="st-dist">0.00 m</span></div>
+      <div class="stat-item"><span class="stat-lbl">현재 위치</span> <span class="stat-val" id="st-pos">(0.0, 0.0)</span></div>
+      <div class="stat-item"><span class="stat-lbl">회전 반경</span> <span class="stat-val" id="st-rad">∞</span></div>
+      <div class="stat-item"><span class="stat-lbl">최근접 장애물</span><span class="stat-val" id="st-near">—</span></div>
+      <div class="stat-item"><span class="stat-lbl">주행 단계</span> <span class="stat-val idle" id="st-phase">대기</span></div>
+      <div class="stat-item"><span class="stat-lbl">방향 오차 θ−90°</span><span class="stat-val" id="st-herr">—</span></div>
+      <div class="stat-item"><span class="stat-lbl">조향 입력</span>  <span class="stat-val" id="st-steer-cmd">—</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Viewport ════════════════════════════════ -->
+<div id="viewport">
+  <canvas id="three-canvas"></canvas>
+  <div id="crash-overlay"><div class="crash-txt">충돌!</div></div>
+  <div id="success-overlay"><div class="success-txt">성공!</div></div>
+
+  <!-- Steering wheel HUD -->
+  <div id="wheel-hud">
+    <canvas id="wheel-canvas" width="100" height="100"></canvas>
+    <div class="wh-label" id="wh-angle">0°</div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hr"><span class="hk">조향각</span><span class="hv" id="h-steer">0.0 °</span></div>
+    <div class="hr"><span class="hk">속도</span><span class="hv" id="h-speed">40 km/h</span></div>
+    <div class="hr"><span class="hk">회전반경</span><span class="hv" id="h-rad">∞</span></div>
+    <hr/>
+    <div class="hr"><span class="hk">단계</span><span class="hv idle" id="h-phase">대기</span></div>
+    <div class="hr"><span class="hk">충돌</span><span class="hv safe" id="h-ccd">안전</span></div>
+    <canvas id="spd-arc" width="124" height="66"></canvas>
+
+    <!-- PD mini meter -->
+    <div class="pd-bar-wrap" id="pd-meter" style="display:none;">
+      <div class="pd-bar-label">
+        <span>방향 오차</span>
+        <span id="pd-err-val">0.0°</span>
+      </div>
+      <div class="pd-bar-track">
+        <div class="pd-bar-fill" id="pd-err-bar" style="width:50%;left:50%;background:#00d4ff;"></div>
+        <div class="pd-bar-center"></div>
+      </div>
+      <div class="pd-bar-label" style="margin-top:5px;">
+        <span>조향 명령</span>
+        <span id="pd-steer-val">0.0°</span>
+      </div>
+      <div class="pd-bar-track">
+        <div class="pd-bar-fill" id="pd-steer-bar" style="width:50%;left:50%;background:#2a7ade;"></div>
+        <div class="pd-bar-center"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div id="legend">
+    <div class="leg-r"><div class="leg-ln" style="background:#00e676;"></div><span class="leg-tx">회피 경로 (안전)</span></div>
+    <div class="leg-r"><div class="leg-ln" style="background:#00d4ff;"></div><span class="leg-tx">PD 복귀 경로</span></div>
+    <div class="leg-r"><div class="leg-ln" style="background:#ff1744;"></div><span class="leg-tx">충돌 예측 경로</span></div>
+    <div class="leg-r"><div class="leg-bx" style="background:#1565c0;"></div><span class="leg-tx">자율주행 차량</span></div>
+    <div class="leg-r"><div class="leg-bx" style="background:#bf360c;"></div><span class="leg-tx">장애물</span></div>
+    <div class="leg-r"><div class="leg-ri" style="color:#ff4444;opacity:.6;"></div><span class="leg-tx">CCD 판정 3m</span></div>
+  </div>
+
+  <!-- Phase info -->
+  <div id="phase-bar">
+    <div class="pb-title">주행 단계</div>
+    <div class="pb-row"><span class="pb-k">현재</span><span class="pb-v" id="pb-phase">대기</span></div>
+    <div class="pb-row"><span class="pb-k">Kp · Kd</span><span class="pb-v" id="pb-pd">0.50 · 0.15</span></div>
+    <div class="pb-row"><span class="pb-k">P 항</span><span class="pb-v" id="pb-p">—</span></div>
+    <div class="pb-row"><span class="pb-k">D 항 (카운터)</span><span class="pb-v" id="pb-d">—</span></div>
+    <div class="pb-row"><span class="pb-k">합산 조향</span><span class="pb-v" id="pb-sum">—</span></div>
+  </div>
+</div>
+
+<!-- ══ Three.js ════════════════════════════════ -->
+<script type="importmap">
+{
+  "imports": {
+    "three":         "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ══════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════
+const WHEELBASE       = 2.5;
+const VEH_RADIUS      = 1.5;
+const OBS_RADIUS      = 1.5;
+const COLL_RADIUS     = VEH_RADIUS + OBS_RADIUS; // 3.0 m
+const CLIFF_X         = 7.5;                     // 낭떠러지 경계 (m) — 이 x 초과 시 추락
+const MAX_STEER       = Math.PI / 6;             // 30°
+const TARGET_THETA    = Math.PI / 2;             // 90° = forward (직진 목표)
+
+// ══════════════════════════════════════════════════════
+//  KINEMATIC BICYCLE MODEL
+//  (simulator2.py :: KinematicBicycleModel — exact port)
+//  θ += (v/L)·tan(δ)·dt
+//  x += v·cos(θ)·dt ,  z -= v·sin(θ)·dt
+// ══════════════════════════════════════════════════════
+class KinematicBicycleModel {
+  constructor(x=0, z=0, theta=Math.PI/2, v=11.11, L=WHEELBASE) {
+    this.x=x; this.z=z; this.theta=theta; this.v=v; this.L=L; this.steer=0;
+  }
+  // GUI: +δ = right → negate for internal model (+δ_internal = left)
+  // steerDeg is now STEERING WHEEL degrees; divide by STEERING_RATIO to get wheel angle
+  // EVADE phase: steerDeg = steering-wheel degrees → ÷ SR to get wheel angle
+  update(steerDeg, dt) {
+    const raw = -(steerDeg / STEERING_RATIO) * Math.PI / 180;
+    const δ   = Math.max(-MAX_STEER, Math.min(MAX_STEER, raw));
+    this.steer = δ;
+    this.theta += (this.v / this.L) * Math.tan(δ) * dt;
+    this.x += this.v * Math.cos(this.theta) * dt;
+    this.z -= this.v * Math.sin(this.theta) * dt;
+  }
+  // PD_RETURN / LANE_RETURN: wheelDeg = actual wheel degrees, bypass SR
+  updateWheelDeg(wheelDeg, dt) {
+    const raw = -wheelDeg * Math.PI / 180;
+    const δ   = Math.max(-MAX_STEER, Math.min(MAX_STEER, raw));
+    this.steer = δ;
+    this.theta += (this.v / this.L) * Math.tan(δ) * dt;
+    this.x += this.v * Math.cos(this.theta) * dt;
+    this.z -= this.v * Math.sin(this.theta) * dt;
+  }
+  clone() { return new KinematicBicycleModel(this.x,this.z,this.theta,this.v,this.L); }
+}
+
+// ══════════════════════════════════════════════════════
+//  PD CONTROLLER
+//  (simulator2.py :: PD 제어 로직 — exact port)
+//
+//  heading_error  = theta_deg - 90          (직진 기준 오차)
+//  error_rate     = (error - prev_error)/dt  (각속도)
+//  steer_python   = clip(-err·Kp_eff - rate·Kd_eff, -30, 30)
+//
+//  Python convention (+ = left = theta↑), GUI convention (+ = right = theta↓)
+//  → steerGUI = -steer_python
+//
+//  ★ 속도 적응형 이득 (speed-adaptive gain)
+//     D항 실효 이득 = Kd · (v/L) : 속도에 비례해 발산
+//     → Kp_eff = Kp · (v_ref/v), Kd_eff = Kd · (v_ref/v) 로 보정
+//     → 루프 이득이 모든 속도에서 동일하게 유지 → 안정
+// ══════════════════════════════════════════════════════
+const PD      = { Kp: 0.5, Kd: 0.05 };  // Kd 낮춤: 속도적응 이후에도 z₂=−0.92 → 진동. 0.05로 z₂=−0.31 → 5스텝(0.1s)내 소멸
+const PD_VREF = 60 / 3.6; // 16.67 m/s — 이득 튜닝 기준 속도
+
+function pdControl(theta, prevErrDeg, dt, v) {
+  // 속도가 클수록 이득을 낮춰 루프 이득 일정하게 유지
+  const scale   = PD_VREF / Math.max(v, 1);
+  const Kp_eff  = PD.Kp * scale;
+  const Kd_eff  = PD.Kd * scale;
+
+  const errDeg  = (theta - TARGET_THETA) * (180 / Math.PI);
+  const errRate = (errDeg - prevErrDeg) / Math.max(dt, 0.001);
+  const steerPy = Math.max(-30, Math.min(30, (-errDeg * Kp_eff) - (errRate * Kd_eff)));
+  const steerGUI = -steerPy; // convert: Python (+ = left) → GUI (+ = right)
+  const pTerm    = -errDeg  * Kp_eff;
+  const dTerm    = -errRate * Kd_eff;
+  return { steerGUI, errDeg, errRate, pTerm, dTerm };
+}
+
+// ══════════════════════════════════════════════════════
+//  CCD — LINE-CIRCLE INTERSECTION
+//  (simulator2.py :: check_line_circle_collision — exact port)
+// ══════════════════════════════════════════════════════
+function ccdLineCircle(p1, p2, cx, cz, radius) {
+  const dx = p2.x-p1.x, dz = p2.z-p1.z;
+  const fx = p1.x-cx,   fz = p1.z-cz;
+  const a = dx*dx+dz*dz, b = 2*(fx*dx+fz*dz), c = fx*fx+fz*fz-radius*radius;
+  if (a < 1e-9) return (fx*fx+fz*fz) <= radius*radius;
+  const disc = b*b - 4*a*c;
+  if (disc < 0) return false;
+  const sq = Math.sqrt(disc);
+  const t1 = (-b-sq)/(2*a), t2 = (-b+sq)/(2*a);
+  return (t1>=0&&t1<=1)||(t2>=0&&t2<=1);
+}
+
+function ccdCheck(p1, p2) {
+  for (const o of OBSTACLES) {
+    if (!o.data.enabled) continue;
+    if (ccdLineCircle(p1, p2, o.data.x, o.data.z, COLL_RADIUS)) return true;
+  }
+  return false;
+}
+
+// ══════════════════════════════════════════════════════
+//  TRAJECTORY SIMULATION WITH PD RETURN
+//  Returns { evadePts, pdPts } — each is [{x,z}]
+// ══════════════════════════════════════════════════════
+const PHYS_DT       = 0.02;  // 적분 정확도 보장 (속도에 무관하게 안정)
+const EVADE_DIST    = 30;    // 꺾기 시작 후 유지 거리 (m) — 직진 거리와 별개
+const STEERING_RATIO = 15;   // 핸들 조향각 / 바퀴 조향각 (일반 승용차 표준)
+const LANE_K         = 2.0;  // 차선 복귀 횡오차 제어 이득 — 값이 클수록 빠른 복귀
+
+function simulateTraj(startModel, steerDeg, steerDist) {
+  const m = startModel.clone();
+  const v = Math.max(m.v, 0.5);
+
+  // 속도에 따라 기록 간격 조정 — 항상 ~1.5m 간격으로 점 기록
+  const recordEvery = Math.max(1, Math.round(1.5 / (v * PHYS_DT)));
+
+  // ── Phase 0: 직진 (steerDist 미터 동안 조향 = 0) ──
+  const straightPts = [{ x:m.x, z:m.z }];
+  let traveled = 0, step = 0;
+  while (traveled < steerDist && straightPts.length < 250) {
+    m.update(0, PHYS_DT);
+    traveled += v * PHYS_DT;
+    if (++step % recordEvery === 0) straightPts.push({ x:m.x, z:m.z });
+  }
+  straightPts.push({ x:m.x, z:m.z });
+
+  // ── Phase 1: 회피 (EVADE_DIST 미터 동안 설정 조향각 유지) ──
+  const evadePts = [{ x:m.x, z:m.z }];
+  traveled = 0; step = 0;
+  while (traveled < EVADE_DIST && evadePts.length < 250) {
+    m.update(steerDeg, PHYS_DT);
+    traveled += v * PHYS_DT;
+    if (++step % recordEvery === 0) evadePts.push({ x:m.x, z:m.z });
+  }
+  evadePts.push({ x:m.x, z:m.z });
+
+  // ── Phase 2: PD 복귀 (heading 교정) — wheel degrees 직접 적용 ──
+  const pdPts = [{ x:m.x, z:m.z }];
+  let prevErr = (m.theta - TARGET_THETA) * (180 / Math.PI);
+  step = 0;
+  let pdDist = 0;
+  for (let i = 0; i < 1200; i++) {
+    const { steerGUI, errDeg } = pdControl(m.theta, prevErr, PHYS_DT, v);
+    prevErr = (m.theta - TARGET_THETA) * (180 / Math.PI);
+    m.updateWheelDeg(steerGUI, PHYS_DT);  // bypass SR: wheel degrees 직접 적용
+    pdDist += v * PHYS_DT;
+    if (++step % recordEvery === 0) pdPts.push({ x:m.x, z:m.z });
+    if (pdDist > 200) break;
+    if (Math.abs(errDeg) < 0.4 && Math.abs(steerGUI) < 0.3) break;
+    if (pdPts.length > 300) break;
+  }
+  pdPts.push({ x:m.x, z:m.z });
+
+  // ── Phase 3: 차선 복귀 — Look-Ahead Heading Controller ──
+  // 전방 lookAhead 거리에서 차선 중심(x=0)을 향하는 목표 헤딩을 설정하고 추종.
+  // Stanley CTE와 달리 헤딩 오차가 negative feedback으로만 동작해 발산 없음.
+  const lanePts = [{ x:m.x, z:m.z }];
+  const la0 = Math.max(10.0, v * 2.0);
+  let prevLaneHdgErr = (m.theta - (Math.PI/2 + Math.atan2(m.x, la0))) * (180/Math.PI);
+  step = 0;
+  for (let i = 0; i < 2000; i++) {
+    const la = Math.max(10.0, v * 2.0);          // 속도 비례 전방 거리
+    const desiredTheta = Math.PI/2 + Math.atan2(m.x, la);
+    const hdgErr = (m.theta - desiredTheta) * (180/Math.PI);
+    const scale  = PD_VREF / Math.max(v, 1);
+    const errRate2 = (hdgErr - prevLaneHdgErr) / PHYS_DT;
+    const steerGUI = Math.max(-30, Math.min(30,
+      (hdgErr * PD.Kp * scale) + (errRate2 * PD.Kd * scale)));
+    prevLaneHdgErr = hdgErr;
+    m.updateWheelDeg(steerGUI, PHYS_DT);
+    if (++step % recordEvery === 0) lanePts.push({ x:m.x, z:m.z });
+    const sHdg = (m.theta - TARGET_THETA) * (180/Math.PI);
+    if (Math.abs(m.x) < 0.3 && Math.abs(sHdg) < 0.5) break;
+    if (lanePts.length > 400) break;
+  }
+  lanePts.push({ x:m.x, z:m.z });
+
+  return { straightPts, evadePts, pdPts, lanePts };
+}
+
+function firstCollisionIdx(pts) {
+  let cum = 0;
+  for (let i = 1; i < pts.length; i++) {
+    cum += Math.hypot(pts[i].x-pts[i-1].x, pts[i].z-pts[i-1].z);
+    if (ccdCheck(pts[i-1], pts[i])) return { idx:i, dist:cum };
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════
+//  THREE.JS SCENE
+// ══════════════════════════════════════════════════════
+const canvas   = document.getElementById('three-canvas');
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x070c17);
+scene.fog = new THREE.FogExp2(0x070c17, 0.0035);
+
+const camera = new THREE.PerspectiveCamera(58,1,0.1,1400);
+camera.position.set(0,8,16);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping=true; orbit.dampingFactor=0.06; orbit.enabled=false;
+
+function resize() {
+  const w=viewport.clientWidth, h=viewport.clientHeight;
+  renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize); resize();
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x182840,2.0));
+const sun = new THREE.DirectionalLight(0xd0e8ff,2.8);
+sun.position.set(60,120,80); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-220; sun.shadow.camera.right=220;
+sun.shadow.camera.top=220;  sun.shadow.camera.bottom=-220;
+sun.shadow.camera.far=500;  sun.shadow.bias=-0.001;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x4488cc,0.4);
+fill.position.set(-40,30,-40); scene.add(fill);
+
+// Environment — 도로 + 낭떠러지
+(function() {
+  const g = new THREE.Group();
+  const addMesh = (geo,mat,rx,x,y,z) => { const m=new THREE.Mesh(geo,mat); if(rx) m.rotation.x=rx; m.position.set(x,y,z); m.receiveShadow=true; g.add(m); return m; };
+
+  // 도로 (±7m, y=0)
+  addMesh(new THREE.PlaneGeometry(14,1000),  new THREE.MeshLambertMaterial({color:0x141b28}), -Math.PI/2, 0,0.01,-450);
+
+  // 차선 중앙선
+  for (let z=10; z>=-480; z-=10) {
+    addMesh(new THREE.PlaneGeometry(0.2,5), new THREE.MeshLambertMaterial({color:0xbbbb88}), -Math.PI/2, 0,0.02,z);
+  }
+  // 차선 경계선
+  [-7,7].forEach(x => addMesh(new THREE.PlaneGeometry(0.25,1000), new THREE.MeshLambertMaterial({color:0xccccaa}), -Math.PI/2, x,0.02,-450));
+  // 연석 (curb)
+  [-7.6,7.6].forEach(x => {
+    const cb=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.18,1000),new THREE.MeshLambertMaterial({color:0x445060}));
+    cb.position.set(x,0.09,-450); cb.castShadow=true; cb.receiveShadow=true; g.add(cb);
+  });
+  const grid = new THREE.GridHelper(16,16,0x091522,0x080e1a);
+  grid.position.set(0,-0.01,-200); g.add(grid);
+
+  // ── 낭떠러지 ────────────────────────────────────────
+  // 절벽 측면 (연석 바깥에서 수직으로 떨어지는 벽)
+  const cliffMat = new THREE.MeshLambertMaterial({color:0x0d1520, side:THREE.DoubleSide});
+  [-7.6, 7.6].forEach(x => {
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(1000,60), cliffMat);
+    face.rotation.y = x > 0 ? -Math.PI/2 : Math.PI/2;
+    face.position.set(x, -30, -450);
+    face.receiveShadow = true;
+    g.add(face);
+  });
+  // 어두운 심연 바닥 (멀리 아래)
+  addMesh(new THREE.PlaneGeometry(600,1200), new THREE.MeshLambertMaterial({color:0x020408}), -Math.PI/2, 0,-65,-500);
+
+  scene.add(g);
+})();
+
+// ── 회피 기동 시작점 마커 ────────────────────────────────────
+// 슬라이더 연동으로 z=-steerDist 위치에 표시되는 수평 글로우 라인
+const _evadeMarkerGeo = new THREE.PlaneGeometry(13.5, 0.3);
+const _evadeMarkerMat = new THREE.MeshBasicMaterial({
+  color:0xffaa00, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false
+});
+const evadeMarker = new THREE.Mesh(_evadeMarkerGeo, _evadeMarkerMat);
+evadeMarker.rotation.x = -Math.PI/2;
+evadeMarker.position.set(0, 0.06, -30); // initial = default 30m
+scene.add(evadeMarker);
+
+// 마커 위에 작은 글로우 라인 (선)
+const _elGeo = new THREE.BufferGeometry().setFromPoints([
+  new THREE.Vector3(-6.75,0,0), new THREE.Vector3(6.75,0,0)
+]);
+const evadeMarkerLine = new THREE.Line(_elGeo, new THREE.LineBasicMaterial({color:0xffcc44, linewidth:2}));
+evadeMarkerLine.position.set(0, 0.1, -30);
+scene.add(evadeMarkerLine);
+
+function updateEvadeMarker() {
+  const d = getV('s-dist');
+  evadeMarker.position.z = -d;
+  evadeMarkerLine.position.z = -d;
+}
+
+// Car factory
+function createCar(bodyColor) {
+  const g=new THREE.Group();
+  const b=new THREE.MeshPhongMaterial({color:bodyColor,shininess:80,specular:0x334466});
+  const gl=new THREE.MeshPhongMaterial({color:0x1a2a44,transparent:true,opacity:.65,shininess:120,specular:0xffffff});
+  const w=new THREE.MeshPhongMaterial({color:0x0f0f0f});
+  const r=new THREE.MeshPhongMaterial({color:0x889aaa,shininess:120});
+  const h=new THREE.MeshPhongMaterial({color:0xffffff,emissive:0x667788});
+  const t=new THREE.MeshPhongMaterial({color:0xff2200,emissive:0x330000});
+
+  const add=(geo,mat,px,py,pz,rx,rz)=>{ const m=new THREE.Mesh(geo,mat); m.position.set(px,py,pz); if(rx)m.rotation.x=rx; if(rz)m.rotation.z=rz; m.castShadow=true; g.add(m); return m; };
+  add(new THREE.BoxGeometry(1.85,.72,4.2), b, 0,.52,0);
+  add(new THREE.BoxGeometry(1.55,.58,2.1), b, 0,1.09,-.15);
+  add(new THREE.PlaneGeometry(1.48,.52), gl, 0,1.02,.9, -.32);
+  add(new THREE.PlaneGeometry(1.48,.52), gl, 0,1.02,-1.22, .32);
+
+  const wGeo=new THREE.CylinderGeometry(.34,.34,.24,20);
+  const rGeo=new THREE.CylinderGeometry(.20,.20,.26,12);
+  const fwm=[]; [[-1,.34,1.45],[1,.34,1.45],[-1,.34,-1.35],[1,.34,-1.35]].forEach(([px,py,pz],i)=>{
+    const wm=add(wGeo,w,px,py,pz,null,Math.PI/2);
+    const rm=add(rGeo,r,px,py,pz,null,Math.PI/2);
+    if(i<2) fwm.push(wm,rm);
+  });
+  g._fw=fwm;
+
+  [[-0.62,.55,2.12],[0.62,.55,2.12]].forEach(([px,py,pz])=>{
+    add(new THREE.BoxGeometry(.32,.15,.05),h,px,py,pz);
+    const pl=new THREE.PointLight(0xffffff,.5,8); pl.position.set(px,py,pz+.5); g.add(pl);
+  });
+  [[-0.62,.55,-2.12],[0.62,.55,-2.12]].forEach(([px,py,pz])=>add(new THREE.BoxGeometry(.32,.15,.05),t,px,py,pz));
+  return g;
+}
+
+// Ego car
+const egoCar = createCar(0x1565c0); scene.add(egoCar);
+const egoDisc = new THREE.Mesh(
+  new THREE.CylinderGeometry(VEH_RADIUS,VEH_RADIUS,.04,32),
+  new THREE.MeshBasicMaterial({color:0x2979ff,transparent:true,opacity:.15,depthWrite:false})
+);
+egoDisc.position.y=.02; egoCar.add(egoDisc);
+const headArrow = new THREE.ArrowHelper(new THREE.Vector3(0,0,1),new THREE.Vector3(0,1.9,0),3.2,0x00e5ff,.6,.35);
+egoCar.add(headArrow);
+
+// Obstacles
+const OBSTACLES=[];
+const DEFAULT_OBS=[{x:0,z:-62,enabled:true}];
+
+function makeObstacle(data) {
+  const mesh=createCar(0xbf360c); mesh.rotation.y=Math.PI; mesh.position.set(data.x,0,data.z); mesh.visible=data.enabled; scene.add(mesh);
+
+  const fd=new THREE.Mesh(new THREE.CylinderGeometry(OBS_RADIUS,OBS_RADIUS,.04,32), new THREE.MeshBasicMaterial({color:0xff6d00,transparent:true,opacity:.18,depthWrite:false}));
+  fd.position.set(data.x,.02,data.z); fd.visible=data.enabled; scene.add(fd);
+
+  const zn=new THREE.Mesh(new THREE.CylinderGeometry(COLL_RADIUS,COLL_RADIUS,.03,48), new THREE.MeshBasicMaterial({color:0xff1744,transparent:true,opacity:.07,depthWrite:false}));
+  zn.position.set(data.x,.015,data.z); zn.visible=data.enabled; scene.add(zn);
+
+  const rg=new THREE.RingGeometry(COLL_RADIUS-.1,COLL_RADIUS,48);
+  const ri=new THREE.Mesh(rg,new THREE.MeshBasicMaterial({color:0xff4444,transparent:true,opacity:.4,side:THREE.DoubleSide,depthWrite:false}));
+  ri.rotation.x=-Math.PI/2; ri.position.set(data.x,.05,data.z); ri.visible=data.enabled; scene.add(ri);
+
+  OBSTACLES.push({mesh,fd,zn,ri,data});
+}
+DEFAULT_OBS.forEach(makeObstacle);
+
+// (도로변 장애물 없음 — x > CLIFF_X 이탈 시 낭떠러지 처리)
+
+// ── Trajectory meshes ───────────────────────
+let trajMeshes=[], collMarker=null;
+
+// Pre-allocated CCD ray — positions updated in-place every frame (zero GC pressure)
+const _ccdPos = new Float32Array(6);
+const _ccdGeo  = new THREE.BufferGeometry();
+_ccdGeo.setAttribute('position', new THREE.BufferAttribute(_ccdPos, 3));
+const ccdLine  = new THREE.Line(_ccdGeo, new THREE.LineBasicMaterial({color:0x006688}));
+ccdLine.visible = false;
+scene.add(ccdLine);
+
+function clearTraj() {
+  trajMeshes.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});
+  trajMeshes=[];
+  if(collMarker){scene.remove(collMarker);collMarker.geometry.dispose();collMarker.material.dispose();collMarker=null;}
+}
+
+// THREE.Line: 좌표 배열 → GPU 직접 — TubeGeometry 대비 10~50× 빠름
+function makeLine(pts, color) {
+  if(pts.length < 2) return;
+  const pos = new Float32Array(pts.length * 3);
+  for(let i=0; i<pts.length; i++){ pos[i*3]=pts[i].x; pos[i*3+1]=0.2; pos[i*3+2]=pts[i].z; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color}));
+  scene.add(line); trajMeshes.push(line);
+}
+
+function addMarker(pos, color) {
+  // SphereGeometry(4,4) — 최소 분할로 경량화
+  const s=new THREE.Mesh(new THREE.SphereGeometry(.18,4,4),new THREE.MeshBasicMaterial({color}));
+  s.position.set(pos.x,.3,pos.z); scene.add(s); trajMeshes.push(s);
+}
+
+function rebuildTrajectory() {
+  clearTraj();
+  const steerDeg=getV('s-steer'), steerDist=getV('s-dist'), speedKmh=getV('s-speed');
+  const sm=egoModel.clone(); sm.v=Math.max(speedKmh/3.6,.5);
+
+  const {straightPts, evadePts, pdPts, lanePts} = simulateTraj(sm, steerDeg, steerDist);
+
+  // 충돌 여부는 미리 표시하지 않음 — 실행 중에 그 순간에 알 수 있게
+  makeLine(straightPts, 0xaaaaaa); // 회색 — 직진
+  makeLine(evadePts,    0x00e676); // 초록 — 회피
+  makeLine(pdPts,       0x00d4ff); // 하늘 — PD 복귀
+  makeLine(lanePts,     0xa020f0); // 보라 — 차선 복귀
+}
+
+// ══════════════════════════════════════════════════════
+//  SIMULATION STATE
+// ══════════════════════════════════════════════════════
+let egoModel=new KinematicBicycleModel(0,0,Math.PI/2,40/3.6,WHEELBASE);
+
+const sim={
+  running:false, time:0, odist:0, camMode:'follow', prevTs:0,
+  accumulator:0,    // 고정 타임스텝 누산기 (fixed-timestep physics)
+  phase:'STRAIGHT', // 'STRAIGHT' | 'EVADE' | 'PD_RETURN' | 'LANE_RETURN' | 'COMPLETE'
+  phaseStart:0,     // odist when current phase began
+  prevHdgErr:0,     // PD: previous heading error (deg)
+  prevLaneErr:0,    // LANE_RETURN: look-ahead heading error (deg)
+  steerCmd:0,       // effective steer command this frame (GUI convention)
+  lastPDResult:null,// { errDeg, pTerm, dTerm }
+  crashed:false,    // 충돌 발생 여부
+  crashTs:0,        // 충돌 발생 timestamp (ms)
+  falling:false,    // 낭떠러지 추락 중
+  fallStartTs:0     // 추락 시작 timestamp (ms)
+};
+
+// ── 렌더 보간 상태 (고정 타임스텝 → 렌더 사이 갭을 속도 외삽으로 채움) ──
+let _rx=egoModel.x, _rz=egoModel.z, _rTheta=egoModel.theta;
+
+function syncEgoCar(ts) {
+  const s=egoModel.steer;
+  egoCar._fw?.forEach(w=>{ w.rotation.set(0,-s,Math.PI/2); });
+
+  // ── 낭떠러지 추락 연출 ────────────────────────────────
+  if(sim.falling && ts !== undefined) {
+    const ft=(ts-sim.fallStartTs)/1000;
+    const fallY = -4.9*ft*ft;                  // g/2 ≈ 4.9 m/s²
+    egoCar.position.set(_rx, fallY, _rz);
+    egoCar.rotation.y = Math.PI/2+_rTheta;
+    egoCar.rotation.z = ft*1.8;                // 옆으로 굴러가는 효과
+    egoCar.rotation.x = Math.sin(ft*4)*0.6;   // 앞뒤 요동
+    // 0.4초 후 충돌 오버레이 + "추락!" 표시
+    if(ft>0.4 && !sim.crashed) {
+      sim.crashed=true; sim.crashTs=ts;
+      EL.hCcd.textContent='추락!'; EL.hCcd.className='hv danger';
+      EL.crashTxt.textContent='추락!';
+      EL.crashOverlay.classList.remove('show');
+      void EL.crashOverlay.offsetWidth;
+      EL.crashOverlay.classList.add('show');
+    }
+    return;
+  }
+
+  egoCar.position.set(_rx,0,_rz);
+  egoCar.rotation.y=Math.PI/2+_rTheta;
+
+  // ── 장애물 충돌 시 흔들림 연출 ──────────────────────────
+  if(sim.crashed && ts !== undefined) {
+    const age=(ts-sim.crashTs)/1000;
+    if(age < 1.2) {
+      const decay=Math.exp(-age*4);
+      egoCar.rotation.z = Math.sin(age*28)*0.45*decay;
+      egoCar.rotation.x = Math.sin(age*19)*0.25*decay;
+      egoCar.position.y = Math.max(0, Math.sin(age*12)*0.6*decay);
+    } else {
+      egoCar.rotation.z=0; egoCar.rotation.x=0; egoCar.position.y=0;
+    }
+  }
+}
+
+// ── Camera smoothing state (lerp target, initialised on first frame) ──
+let _camSX=null, _camSY=null, _camSZ=null;
+
+function stepCamera(dt) {
+  const θ=_rTheta;
+  const fx=Math.cos(θ), fz=-Math.sin(θ);
+
+  // 추락 중 카메라: 차와 함께 내려가며 아래를 내려다봄
+  if(sim.falling) {
+    const carY = egoCar.position.y;
+    const tX=_rx-fx*10, tY=carY+7, tZ=_rz-fz*10;
+    if(_camSX===null){ _camSX=tX; _camSY=tY; _camSZ=tZ; }
+    const k=dt>0?1-Math.exp(-dt*6):1;
+    _camSX+=( tX-_camSX)*k; _camSY+=(tY-_camSY)*k; _camSZ+=(tZ-_camSZ)*k;
+    camera.position.set(_camSX,_camSY,_camSZ);
+    camera.lookAt(_rx, carY, _rz);
+    return;
+  }
+
+  if(sim.camMode==='follow'){
+    const tX=_rx-fx*14, tY=1.5+6.5, tZ=_rz-fz*14;
+    if(_camSX===null){ _camSX=tX; _camSY=tY; _camSZ=tZ; }
+    const k = dt>0 ? 1-Math.exp(-dt*10) : 1;
+    _camSX+=( tX-_camSX)*k;
+    _camSY+=( tY-_camSY)*k;
+    _camSZ+=( tZ-_camSZ)*k;
+    camera.position.set(_camSX,_camSY,_camSZ);
+    camera.lookAt(_rx,1.5,_rz);
+  } else if(sim.camMode==='top'){
+    _camSX=null;
+    camera.position.set(_rx,75,_rz+8);
+    camera.lookAt(_rx,0,_rz);
+  } else {
+    _camSX=null;
+  }
+}
+
+// ── DOM element cache (avoid getElementById in hot path) ────────────
+const EL = {
+  hSteer:     document.getElementById('h-steer'),
+  hSpeed:     document.getElementById('h-speed'),
+  hRad:       document.getElementById('h-rad'),
+  hPhase:     document.getElementById('h-phase'),
+  hCcd:       document.getElementById('h-ccd'),
+  pbPhase:    document.getElementById('pb-phase'),
+  stPhase:    document.getElementById('st-phase'),
+  stTime:     document.getElementById('st-time'),
+  stDist:     document.getElementById('st-dist'),
+  stPos:      document.getElementById('st-pos'),
+  stRad:      document.getElementById('st-rad'),
+  stSteerCmd: document.getElementById('st-steer-cmd'),
+  stNear:     document.getElementById('st-near'),
+  stHerr:     document.getElementById('st-herr'),
+  pdMeter:    document.getElementById('pd-meter'),
+  pdErrVal:   document.getElementById('pd-err-val'),
+  pdErrBar:   document.getElementById('pd-err-bar'),
+  pdSteerVal: document.getElementById('pd-steer-val'),
+  pdSteerBar: document.getElementById('pd-steer-bar'),
+  pbPd:       document.getElementById('pb-pd'),
+  pbP:        document.getElementById('pb-p'),
+  pbD:        document.getElementById('pb-d'),
+  pbSum:      document.getElementById('pb-sum'),
+  btnRun:        document.getElementById('btn-run'),
+  crashOverlay:  document.getElementById('crash-overlay'),
+  crashTxt:      document.querySelector('#crash-overlay .crash-txt'),
+  successOverlay:document.getElementById('success-overlay'),
+  sSteer:        document.getElementById('s-steer'),
+  sDist:         document.getElementById('s-dist'),
+  sSpeed:        document.getElementById('s-speed'),
+};
+const _arcCanvas = document.getElementById('spd-arc');
+const _arcCtx    = _arcCanvas.getContext('2d');
+
+// ── Speedometer ──────────────────────────────
+function drawArc(spd) {
+  const c=_arcCanvas, ctx=_arcCtx;
+  const cx=c.width/2,cy=c.height-4,r=48;
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,2*Math.PI);ctx.strokeStyle='#0a1828';ctx.lineWidth=7;ctx.stroke();
+  const g=ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+  g.addColorStop(0,'#00e676');g.addColorStop(.6,'#ffcc00');g.addColorStop(1,'#ff1744');
+  ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,Math.PI+Math.min(spd/120,1)*Math.PI);
+  ctx.strokeStyle=g;ctx.lineWidth=7;ctx.lineCap='round';ctx.stroke();
+  ctx.fillStyle='#6aacee';ctx.font='bold 19px Courier New';ctx.textAlign='center';ctx.fillText(spd,cx,cy-11);
+  ctx.font='9px sans-serif';ctx.fillStyle='#1f3a5a';ctx.fillText('km/h',cx,cy+1);
+}
+
+// ── Steering wheel canvas ─────────────────────
+const _wheelCanvas = document.getElementById('wheel-canvas');
+const _wheelCtx    = _wheelCanvas.getContext('2d');
+const _whAngleEl   = document.getElementById('wh-angle');
+
+function drawWheel(angleDeg) {
+  const c=_wheelCanvas, ctx=_wheelCtx;
+  const W=c.width, H=c.height, cx=W/2, cy=H/2, R=38, r=8;
+  const rad = angleDeg * Math.PI / 180;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(rad);
+
+  // 외부 림(rim)
+  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2);
+  const rimGrad=ctx.createRadialGradient(0,0,R-6,0,0,R+1);
+  rimGrad.addColorStop(0,'#2a7ade'); rimGrad.addColorStop(1,'#1a4a8e');
+  ctx.strokeStyle=rimGrad; ctx.lineWidth=6; ctx.stroke();
+
+  // 외부 림 하이라이트
+  ctx.beginPath(); ctx.arc(0,0,R,-.6,-.2);
+  ctx.strokeStyle='rgba(150,210,255,.35)'; ctx.lineWidth=3; ctx.stroke();
+
+  // 스포크 3개 (120° 간격)
+  const spokeAngles=[Math.PI/2, Math.PI/2+2*Math.PI/3, Math.PI/2+4*Math.PI/3];
+  spokeAngles.forEach(a=>{
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*r*1.1, Math.sin(a)*r*1.1);
+    ctx.lineTo(Math.cos(a)*(R-3), Math.sin(a)*(R-3));
+    ctx.strokeStyle='#2a6acc'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+  });
+
+  // 중앙 허브
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+  const hubGrad=ctx.createRadialGradient(-2,-2,1,0,0,r);
+  hubGrad.addColorStop(0,'#5aabf0'); hubGrad.addColorStop(1,'#1a4a8e');
+  ctx.fillStyle=hubGrad; ctx.fill();
+  ctx.strokeStyle='#3a8ad8'; ctx.lineWidth=1.5; ctx.stroke();
+
+  ctx.restore();
+
+  // 각도 레이블 업데이트
+  _whAngleEl.textContent = (angleDeg >= 0 ? '+' : '') + angleDeg.toFixed(0) + '°';
+}
+drawWheel(0); // 초기 렌더
+
+// ── HUD / status update ───────────────────────
+const PHASE_LABEL = { STRAIGHT:'직진', EVADE:'회피 중', PD_RETURN:'PD 복귀', LANE_RETURN:'차선 복귀', COMPLETE:'복귀 완료', IDLE:'대기' };
+const PHASE_CLASS = { STRAIGHT:'idle', EVADE:'evade', PD_RETURN:'pd', LANE_RETURN:'lane', COMPLETE:'done', IDLE:'idle' };
+
+function updateUI(ts) {
+  const stDeg=getV('s-steer'), spd=getV('s-speed');
+  const stRad=Math.abs(stDeg)>.1?stDeg*Math.PI/180:0;
+  const R=Math.abs(stRad)>1e-3?WHEELBASE/Math.tan(Math.abs(stRad)):Infinity;
+  const Rstr=isFinite(R)?`${R.toFixed(1)} m`:'∞';
+
+  EL.hSteer.textContent=`${sim.steerCmd.toFixed(1)} °`;
+  EL.hSpeed.textContent=`${spd} km/h`;
+  EL.hRad.textContent=Rstr;
+
+  const phKey=sim.running?sim.phase:'IDLE';
+  const phLbl=PHASE_LABEL[phKey]||'—';
+  const phCls=PHASE_CLASS[phKey]||'idle';
+  EL.hPhase.textContent=phLbl;  EL.hPhase.className=`hv ${phCls}`;
+  if(EL.pbPhase){ EL.pbPhase.textContent=phLbl; EL.pbPhase.className=`hv ${phCls}`; }
+  EL.stPhase.textContent=phLbl; EL.stPhase.className=`stat-val ${phCls}`;
+
+  EL.stTime.textContent=`${sim.time.toFixed(2)} s`;
+  EL.stDist.textContent=`${sim.odist.toFixed(2)} m`;
+  EL.stPos.textContent=`(${egoModel.x.toFixed(1)}, ${(-egoModel.z).toFixed(1)})`;
+  EL.stRad.textContent=Rstr;
+  EL.stSteerCmd.textContent=`${sim.steerCmd.toFixed(2)} °`;
+
+  let nearDist=Infinity;
+  OBSTACLES.forEach(o=>{ if(!o.data.enabled)return; const d=Math.hypot(egoModel.x-o.data.x,egoModel.z-o.data.z); if(d<nearDist)nearDist=d; });
+  EL.stNear.textContent=isFinite(nearDist)?`${nearDist.toFixed(1)} m`:'—';
+
+  // PD details
+  if(sim.phase==='PD_RETURN'&&sim.running&&sim.lastPDResult){
+    EL.pdMeter.style.display='';
+    const {errDeg,pTerm,dTerm}=sim.lastPDResult;
+    EL.pdErrVal.textContent=`${errDeg.toFixed(2)}°`;
+    EL.pdSteerVal.textContent=`${sim.steerCmd.toFixed(2)}°`;
+    EL.stHerr.textContent=`${errDeg.toFixed(2)}°`;
+    const errPct=Math.max(0,Math.min(100,50+errDeg*50/30));
+    if(errDeg>=0){EL.pdErrBar.style.left='50%';EL.pdErrBar.style.width=(errPct-50)+'%';EL.pdErrBar.style.background='#ff6b44';}
+    else{EL.pdErrBar.style.left=errPct+'%';EL.pdErrBar.style.width=(50-errPct)+'%';EL.pdErrBar.style.background='#44aaff';}
+    const stPct=Math.max(0,Math.min(100,50+sim.steerCmd*50/30));
+    if(sim.steerCmd>=0){EL.pdSteerBar.style.left='50%';EL.pdSteerBar.style.width=(stPct-50)+'%';EL.pdSteerBar.style.background='#2a7ade';}
+    else{EL.pdSteerBar.style.left=stPct+'%';EL.pdSteerBar.style.width=(50-stPct)+'%';EL.pdSteerBar.style.background='#ae44de';}
+    EL.pbPd.textContent=`${PD.Kp.toFixed(2)} · ${PD.Kd.toFixed(2)}`;
+    EL.pbP.textContent=`${pTerm.toFixed(3)}°`;
+    EL.pbD.textContent=`${dTerm.toFixed(3)}° (카운터)`;
+    EL.pbSum.textContent=`${sim.steerCmd.toFixed(3)}°`;
+  } else {
+    EL.pdMeter.style.display='none';
+    EL.stHerr.textContent=sim.phase==='PD_RETURN'||sim.phase==='COMPLETE'?'수렴':'—';
+    EL.pbPd.textContent=`${PD.Kp.toFixed(2)} · ${PD.Kd.toFixed(2)}`;
+    EL.pbP.textContent='—'; EL.pbD.textContent='—'; EL.pbSum.textContent='—';
+  }
+
+  drawArc(spd);
+
+  // 핸들 시각화 — EVADE는 슬라이더값, 자동구간은 wheel→SW 환산
+  const wheelVisAngle = (sim.running && sim.phase !== 'EVADE' && sim.phase !== 'STRAIGHT')
+    ? Math.max(-90, Math.min(90, sim.steerCmd * STEERING_RATIO))
+    : stDeg;
+  drawWheel(wheelVisAngle);
+}
+
+// ══════════════════════════════════════════════════════
+//  ANIMATION LOOP
+// ══════════════════════════════════════════════════════
+let _trajKey='';
+
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const frameDt=sim.prevTs?Math.min((ts-sim.prevTs)/1000,.1):0;
+  sim.prevTs=ts;
+
+  const steerDeg=getV('s-steer'), steerDist=getV('s-dist'), speedKmh=getV('s-speed');
+
+  // ── 고정 타임스텝 물리 (Fixed-timestep physics) ────────────────────────────
+  // 렌더 프레임 시간을 누산해 PHYS_DT 단위로 소비 → 프레임레이트 무관 결정론적 시뮬
+  if(sim.running&&frameDt>0&&speedKmh>0) {
+    sim.accumulator+=frameDt;
+    let lastP1={x:egoModel.x, z:egoModel.z};
+    let lastP2=lastP1;
+
+    while(sim.accumulator>=PHYS_DT&&sim.running) {
+      sim.accumulator-=PHYS_DT;
+
+      egoModel.v=speedKmh/3.6;
+      const p1={x:egoModel.x, z:egoModel.z};
+      const phaseBeforeUpdate = sim.phase; // 페이즈 전환 전 값 보존 (model 업데이트 방식 결정용)
+
+      let steerCmd;
+
+      // ── Phase logic ──────────────────────────
+      if(sim.phase==='STRAIGHT') {
+        steerCmd=0;
+        if(sim.odist-sim.phaseStart>=steerDist) {
+          sim.phase='EVADE'; sim.phaseStart=sim.odist;
+        }
+
+      } else if(sim.phase==='EVADE') {
+        steerCmd=steerDeg;
+        if(sim.odist-sim.phaseStart>=EVADE_DIST) {
+          sim.phase='PD_RETURN'; sim.phaseStart=sim.odist;
+          sim.prevHdgErr=(egoModel.theta-TARGET_THETA)*(180/Math.PI);
+        }
+
+      } else if(sim.phase==='PD_RETURN') {
+        // ── PD 제어 — 항상 PHYS_DT 사용 → 결정론적 ─────
+        const pd=pdControl(egoModel.theta, sim.prevHdgErr, PHYS_DT, egoModel.v);
+        steerCmd=pd.steerGUI;
+        sim.prevHdgErr=(egoModel.theta-TARGET_THETA)*(180/Math.PI);
+        sim.lastPDResult=pd;
+
+        if(Math.abs(pd.errDeg)<1.0&&Math.abs(steerCmd)<0.5) {
+          sim.phase='LANE_RETURN';
+          // prevLaneErr을 진입 시점 실제 hdgErr로 초기화 → D항 스파이크 방지
+          const initLA=Math.max(10.0, egoModel.v*2.0);
+          const initDT=Math.PI/2+Math.atan2(egoModel.x, initLA);
+          sim.prevLaneErr=(egoModel.theta-initDT)*(180/Math.PI);
+          steerCmd=0;
+        }
+
+      } else if(sim.phase==='LANE_RETURN') {
+        // ── 차선 복귀 — Look-Ahead Heading Controller ──
+        // desiredTheta: 전방 lookAhead 거리에서 x=0을 향하는 헤딩 → negative feedback 보장
+        const xErr=egoModel.x;
+        const v=egoModel.v;
+        const lookAhead=Math.max(10.0, v*2.0);
+        const desiredTheta=Math.PI/2+Math.atan2(xErr, lookAhead);
+        const hdgErrDeg=(egoModel.theta-desiredTheta)*(180/Math.PI);
+        const scale=PD_VREF/Math.max(v,1);
+        const errRate=(hdgErrDeg-sim.prevLaneErr)/PHYS_DT;
+        steerCmd=Math.max(-30,Math.min(30,
+          (hdgErrDeg*PD.Kp*scale)+(errRate*PD.Kd*scale)));
+        sim.prevLaneErr=hdgErrDeg;
+
+        const sHdg=(egoModel.theta-TARGET_THETA)*(180/Math.PI);
+        if(Math.abs(xErr)<0.3&&Math.abs(sHdg)<0.5) {
+          sim.phase='COMPLETE'; steerCmd=0;
+          // 성공 — 시뮬 정지 + 성공 오버레이
+          sim.running=false;
+          EL.btnRun.classList.add('hidden');
+          EL.btnRun.classList.remove('active');
+          EL.btnRun.textContent='▶ 실행';
+          EL.successOverlay.classList.remove('show');
+          void EL.successOverlay.offsetWidth;
+          EL.successOverlay.classList.add('show');
+        }
+
+      } else { // COMPLETE — 이미 정지됨, 여기엔 도달하지 않음
+        steerCmd=0;
+      }
+
+      sim.steerCmd=steerCmd;
+      // EVADE 단계만 SR 통과 (핸들 조향각 → 바퀴 조향각)
+      // 나머지 자동 제어(PD·차선복귀)는 wheel deg 직접 적용
+      if(phaseBeforeUpdate==='EVADE') {
+        egoModel.update(steerCmd, PHYS_DT);
+      } else {
+        egoModel.updateWheelDeg(steerCmd, PHYS_DT);
+      }
+      const p2={x:egoModel.x, z:egoModel.z};
+      sim.time+=PHYS_DT;
+      sim.odist+=egoModel.v*PHYS_DT;
+
+      lastP1=p1; lastP2=p2;
+
+      // 낭떠러지 이탈 검사 (x 경계 초과)
+      if(!sim.falling && Math.abs(egoModel.x) > CLIFF_X) {
+        sim.running=false; sim.falling=true;
+        sim.fallStartTs=performance.now();
+        EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
+        EL.btnRun.classList.add('hidden'); // 초기화 버튼만 남김
+        EL.crashTxt.textContent='추락!';
+        break;
+      }
+
+      // Real-time CCD (서브스텝마다 검사 — 고속 터널링 방지)
+      if(ccdCheck(p1,p2)) {
+        sim.running=false;
+        sim.crashed=true; sim.crashTs=performance.now();
+        EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
+        EL.btnRun.classList.add('hidden'); // 초기화 버튼만 남김
+        EL.hCcd.textContent='충돌!'; EL.hCcd.className='hv danger';
+        EL.crashTxt.textContent='충돌!';
+        EL.crashOverlay.classList.remove('show');
+        void EL.crashOverlay.offsetWidth; // reflow
+        EL.crashOverlay.classList.add('show');
+        break;
+      }
+    }
+
+    // CCD ray line — 마지막 서브스텝 위치로 갱신
+    _ccdPos[0]=lastP1.x; _ccdPos[1]=.3; _ccdPos[2]=lastP1.z;
+    _ccdPos[3]=lastP2.x; _ccdPos[4]=.3; _ccdPos[5]=lastP2.z;
+    _ccdGeo.attributes.position.needsUpdate=true;
+    ccdLine.visible=true;
+  } else {
+    sim.steerCmd=0;
+    ccdLine.visible=false;
+  }
+
+  // 궤적은 Run 버튼 클릭 시에만 갱신 — 슬라이더 변경 시 자동 재빌드 제거
+
+  // Pulse collision marker
+  if(collMarker) collMarker.material.opacity=.5+.3*Math.sin(ts*.006);
+
+  // ── 렌더 외삽 (Render-state extrapolation) ────────────────────────────
+  // 물리 스텝 사이의 남은 시간(accumulator)만큼 현재 속도/각속도로 위치를 예측해
+  // 60fps 렌더와 50Hz 물리의 위상 불일치로 인한 끊김/흔들림 제거
+  if(sim.running) {
+    const t=sim.accumulator;
+    const cv=egoModel.v, cθ=egoModel.theta, cs=egoModel.steer;
+    _rx    =egoModel.x     + cv*Math.cos(cθ)*t;
+    _rz    =egoModel.z     - cv*Math.sin(cθ)*t;
+    _rTheta=cθ             + (cv/WHEELBASE)*Math.tan(cs)*t;
+  } else {
+    _rx=egoModel.x; _rz=egoModel.z; _rTheta=egoModel.theta;
+  }
+
+  syncEgoCar(ts);
+  stepCamera(frameDt);
+  updateUI(ts);
+  if(sim.camMode==='free') orbit.update();
+  renderer.render(scene,camera);
+}
+
+// ══════════════════════════════════════════════════════
+//  SLIDER ↔ NUMBER SYNC
+// ══════════════════════════════════════════════════════
+function getV(id) {
+  // Use cached element if available, otherwise fall back to getElementById
+  if(id==='s-steer') return parseFloat(EL.sSteer.value);
+  if(id==='s-dist')  return parseFloat(EL.sDist.value);
+  if(id==='s-speed') return parseFloat(EL.sSpeed.value);
+  return parseFloat(document.getElementById(id).value);
+}
+
+function bindPair(sId,nId,onchange) {
+  const s=document.getElementById(sId), n=document.getElementById(nId);
+  s.addEventListener('input',()=>{ n.value=s.value; onchange?.(); });
+  n.addEventListener('input',()=>{
+    const mn=parseFloat(s.min),mx=parseFloat(s.max); let v=parseFloat(n.value);
+    if(isNaN(v))return; v=Math.max(mn,Math.min(mx,v)); s.value=v; n.value=v; onchange?.();
+  });
+  n.addEventListener('change',()=>{
+    const mn=parseFloat(s.min),mx=parseFloat(s.max); let v=parseFloat(n.value);
+    if(isNaN(v))v=parseFloat(s.value); v=Math.max(mn,Math.min(mx,v)); s.value=v; n.value=v; onchange?.();
+  });
+}
+
+// Slider fill via CSS --pct variable
+function updateSliderFill(el) {
+  const mn=parseFloat(el.min)||0, mx=parseFloat(el.max)||100;
+  const pct=((parseFloat(el.value)-mn)/(mx-mn)*100).toFixed(1)+'%';
+  el.style.setProperty('--pct', pct);
+}
+
+bindPair('s-steer','n-steer',()=>{ updateSliderFill(document.getElementById('s-steer')); drawWheel(getV('s-steer')); });
+bindPair('s-dist', 'n-dist', ()=>{ updateSliderFill(document.getElementById('s-dist')); updateEvadeMarker(); });
+bindPair('s-speed','n-speed',()=>updateSliderFill(document.getElementById('s-speed')));
+// initialise fill on page load
+['s-steer','s-dist','s-speed'].forEach(id=>updateSliderFill(document.getElementById(id)));
+// Kp/Kd are fixed constants — no UI sliders
+
+// ══════════════════════════════════════════════════════
+//  BUTTONS
+// ══════════════════════════════════════════════════════
+window.toggleRun=function(){
+  sim.running=!sim.running;
+  if(sim.running){
+    // 실행 시작: 상태 초기화 + 궤적 재빌드
+    sim.phase='STRAIGHT'; sim.phaseStart=sim.odist;
+    sim.prevHdgErr=0; sim.prevLaneErr=0;
+    sim.lastPDResult=null;
+    sim.crashed=false; sim.crashTs=0;
+    sim.falling=false; sim.fallStartTs=0;
+    EL.crashOverlay.classList.remove('show');
+    EL.successOverlay.classList.remove('show');
+    EL.crashTxt.textContent='충돌!'; // 기본값 복원
+    EL.hCcd.textContent='안전'; EL.hCcd.className='hv safe';
+    EL.btnRun.classList.remove('hidden');
+    evadeMarker.visible = false;       // 실행 중 마커 숨김
+    evadeMarkerLine.visible = false;
+    rebuildTrajectory(); // Run 클릭 순간에만 궤적 생성
+  }
+  EL.btnRun.textContent=sim.running?'⏹ 정지':'▶ 실행';
+  EL.btnRun.classList.toggle('active',sim.running);
+  if(!sim.running) ccdLine.visible=false;
+};
+
+window.resetSim=function(){
+  sim.running=false; sim.time=0; sim.odist=0; sim.prevTs=0; sim.accumulator=0;
+  sim.phase='STRAIGHT'; sim.phaseStart=0;
+  sim.prevHdgErr=0; sim.prevLaneErr=0;
+  sim.steerCmd=0; sim.lastPDResult=null;
+  sim.crashed=false; sim.crashTs=0;
+  sim.falling=false; sim.fallStartTs=0;
+  egoModel=new KinematicBicycleModel(0,0,Math.PI/2,getV('s-speed')/3.6,WHEELBASE);
+  _rx=egoModel.x; _rz=egoModel.z; _rTheta=egoModel.theta; // 렌더 상태 동기화
+  egoCar.rotation.z=0; egoCar.rotation.x=0; egoCar.position.y=0;
+  ccdLine.visible=false;
+  EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
+  EL.btnRun.classList.remove('hidden'); // 실행 버튼 복원
+  EL.crashOverlay.classList.remove('show');
+  EL.successOverlay.classList.remove('show');
+  EL.crashTxt.textContent='충돌!'; // 기본값 복원
+  EL.hCcd.textContent='안전'; EL.hCcd.className='hv safe';
+  clearTraj(); // 초기화 시 궤적도 제거
+  evadeMarker.visible = true;        // 마커 다시 표시
+  evadeMarkerLine.visible = true;
+  updateEvadeMarker(); // 마커 위치 동기화
+};
+
+window.setCamera=function(mode){
+  sim.camMode=mode;
+  ['follow','top','free'].forEach(m=>document.getElementById(`cam-${m}`).classList.toggle('active',m===mode));
+  orbit.enabled=mode==='free';
+  if(mode==='free'){orbit.target.copy(egoCar.position);orbit.update();}
+  _camSX=null; // reset follow-cam smoothing on any mode switch
+};
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+// 궤적은 Run 버튼 클릭 시에만 생성 (초기에는 빈 씬)
+requestAnimationFrame(animate);
+
+setTimeout(()=>{
+  const el=document.getElementById('loading');
+  el.style.opacity='0'; setTimeout(()=>el.style.display='none',500);
+},900);
+
+</script>
+</body>
+</html>
