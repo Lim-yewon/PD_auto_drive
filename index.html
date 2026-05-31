@@ -259,13 +259,13 @@
     #wheel-hud {
       position:absolute; top:14px; left:14px; z-index:5;
       background:rgba(6,10,22,.88); border:1px solid rgba(42,122,222,.14);
-      border-radius:12px; padding:10px;
+      border-radius:14px; padding:12px 12px 8px;
       backdrop-filter:blur(10px);
       box-shadow:0 4px 24px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.04);
     }
     #wheel-hud .wh-label {
-      text-align:center; font-size:10px; color:#5a88aa;
-      letter-spacing:1px; margin-top:5px; font-family:'Noto Sans KR',sans-serif;
+      text-align:center; font-size:13px; font-weight:700; color:#7aaccc;
+      letter-spacing:1px; margin-top:6px; font-family:'Courier New',monospace;
     }
     #wheel-canvas { display:block; }
 
@@ -374,10 +374,10 @@
     <div class="ctrl">
       <span class="ctrl-label">회피 기동 시작점</span>
       <div class="ctrl-row">
-        <input type="range"  id="s-dist" min="5" max="120" value="30" step="1"/>
-        <input type="number" id="n-dist" min="5" max="120" value="30" step="1"/>
+        <input type="range"  id="s-dist" min="5" max="59" value="30" step="1"/>
+        <input type="number" id="n-dist" min="5" max="59" value="30" step="1"/>
       </div>
-      <div class="range-lbl"><span>5m</span><span>60m</span><span>120m</span></div>
+      <div class="range-lbl"><span>5m</span><span>32m</span><span>59m</span></div>
     </div>
 
     <div class="ctrl">
@@ -433,7 +433,7 @@
 
   <!-- Steering wheel HUD -->
   <div id="wheel-hud">
-    <canvas id="wheel-canvas" width="100" height="100"></canvas>
+    <canvas id="wheel-canvas" width="140" height="140"></canvas>
     <div class="wh-label" id="wh-angle">0°</div>
   </div>
 
@@ -1068,44 +1068,113 @@ const _whAngleEl   = document.getElementById('wh-angle');
 
 function drawWheel(angleDeg) {
   const c=_wheelCanvas, ctx=_wheelCtx;
-  const W=c.width, H=c.height, cx=W/2, cy=H/2, R=38, r=8;
-  const rad = angleDeg * Math.PI / 180;
+  const W=c.width, H=c.height, cx=W/2, cy=H/2;
+  const R=50;           // 림 중심 반지름
+  const RW=10;          // 림 두께
+  const Ro=R+RW/2, Ri=R-RW/2;  // 림 외·내경
+  const HR=14;          // 허브 x반지름
 
   ctx.clearRect(0,0,W,H);
+
+  // ── 고정 요소 (회전 없음) ─────────────────────────
   ctx.save();
   ctx.translate(cx,cy);
-  ctx.rotate(rad);
+  const refR=Ro+6;
 
-  // 외부 림(rim)
-  ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2);
-  const rimGrad=ctx.createRadialGradient(0,0,R-6,0,0,R+1);
-  rimGrad.addColorStop(0,'#2a7ade'); rimGrad.addColorStop(1,'#1a4a8e');
-  ctx.strokeStyle=rimGrad; ctx.lineWidth=6; ctx.stroke();
+  // 배경 기준 원
+  ctx.beginPath(); ctx.arc(0,0,refR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1; ctx.stroke();
 
-  // 외부 림 하이라이트
-  ctx.beginPath(); ctx.arc(0,0,R,-.6,-.2);
-  ctx.strokeStyle='rgba(150,210,255,.35)'; ctx.lineWidth=3; ctx.stroke();
+  // 12시 고정 삼각 기준점
+  ctx.beginPath();
+  ctx.moveTo(0,-(refR+1)); ctx.lineTo(-5,-(refR+9)); ctx.lineTo(5,-(refR+9));
+  ctx.closePath();
+  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.fill();
 
-  // 스포크 3개 (120° 간격)
-  const spokeAngles=[Math.PI/2, Math.PI/2+2*Math.PI/3, Math.PI/2+4*Math.PI/3];
-  spokeAngles.forEach(a=>{
+  // 눈금 ±45°(흰), ±90°(빨강)
+  [[-90,'rgba(255,100,100,0.55)'],[-45,'rgba(255,255,255,0.2)'],
+   [45,'rgba(255,255,255,0.2)'],[90,'rgba(255,100,100,0.55)']].forEach(([deg,col])=>{
+    const a=(deg-90)*Math.PI/180;
     ctx.beginPath();
-    ctx.moveTo(Math.cos(a)*r*1.1, Math.sin(a)*r*1.1);
-    ctx.lineTo(Math.cos(a)*(R-3), Math.sin(a)*(R-3));
-    ctx.strokeStyle='#2a6acc'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+    ctx.moveTo(Math.cos(a)*(refR+2),Math.sin(a)*(refR+2));
+    ctx.lineTo(Math.cos(a)*(refR+9),Math.sin(a)*(refR+9));
+    ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.stroke();
   });
-
-  // 중앙 허브
-  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
-  const hubGrad=ctx.createRadialGradient(-2,-2,1,0,0,r);
-  hubGrad.addColorStop(0,'#5aabf0'); hubGrad.addColorStop(1,'#1a4a8e');
-  ctx.fillStyle=hubGrad; ctx.fill();
-  ctx.strokeStyle='#3a8ad8'; ctx.lineWidth=1.5; ctx.stroke();
-
   ctx.restore();
 
-  // 각도 레이블 업데이트
-  _whAngleEl.textContent = (angleDeg >= 0 ? '+' : '') + angleDeg.toFixed(0) + '°';
+  // ── 회전 요소 ────────────────────────────────────
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(angleDeg*Math.PI/180);
+
+  // ① 림 — filled ring (실제 스티어링 휠 단면)
+  ctx.shadowColor='rgba(0,0,0,0.65)';
+  ctx.shadowBlur=14; ctx.shadowOffsetX=2; ctx.shadowOffsetY=5;
+  ctx.beginPath();
+  ctx.arc(0,0,Ro,0,Math.PI*2,false);
+  ctx.arc(0,0,Ri,0,Math.PI*2,true);
+  const rimG=ctx.createLinearGradient(-Ro,-Ro,Ro,Ro);
+  rimG.addColorStop(0,'#5a6880');
+  rimG.addColorStop(0.4,'#9aaabb');
+  rimG.addColorStop(0.7,'#3a4858');
+  rimG.addColorStop(1,'#1e2a38');
+  ctx.fillStyle=rimG; ctx.fill('evenodd');
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+
+  // 림 광택 호
+  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI*0.72,-Math.PI*0.20);
+  ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=3.5; ctx.stroke();
+
+  // ② 스포크 — 사다리꼴 채우기 (Y형: 10시·2시·6시)
+  const SW_H=11, SW_R=4.5;   // 허브쪽·림쪽 반폭
+  [-Math.PI/2-Math.PI/4.5, -Math.PI/2+Math.PI/4.5, Math.PI/2].forEach(angle=>{
+    const dx=Math.cos(angle), dy=Math.sin(angle);
+    const px=-dy, py=dx;
+    const sR=HR+2;
+    ctx.beginPath();
+    ctx.moveTo(dx*sR+px*SW_H,  dy*sR+py*SW_H);
+    ctx.lineTo(dx*Ri +px*SW_R, dy*Ri +py*SW_R);
+    ctx.lineTo(dx*Ri -px*SW_R, dy*Ri -py*SW_R);
+    ctx.lineTo(dx*sR -px*SW_H, dy*sR -py*SW_H);
+    ctx.closePath();
+    const sg=ctx.createLinearGradient(dx*sR,dy*sR,dx*Ri,dy*Ri);
+    sg.addColorStop(0,'#7888a0'); sg.addColorStop(0.5,'#4a5870'); sg.addColorStop(1,'#2e3a4e');
+    ctx.fillStyle=sg; ctx.fill();
+    // 스포크 하이라이트
+    ctx.beginPath();
+    ctx.moveTo(dx*sR+px*(SW_H-2),dy*sR+py*(SW_H-2));
+    ctx.lineTo(dx*Ri+px*(SW_R-1),dy*Ri+py*(SW_R-1));
+    ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
+  });
+
+  // ③ 허브 패드 (에어백 커버 — 실제 핸들처럼 넓은 타원형)
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.ellipse(0,0,HR+4,HR+2,0,0,Math.PI*2);
+  const hubG=ctx.createRadialGradient(-4,-5,1,0,0,HR+4);
+  hubG.addColorStop(0,'#8898b0'); hubG.addColorStop(0.55,'#4a5870'); hubG.addColorStop(1,'#252f3e');
+  ctx.fillStyle=hubG; ctx.fill();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+  ctx.strokeStyle='rgba(140,160,180,0.4)'; ctx.lineWidth=1.2; ctx.stroke();
+
+  // 허브 수평 버튼라인 (실제 핸들 버튼 느낌)
+  ctx.beginPath();
+  ctx.moveTo(-(HR-2),0); ctx.lineTo((HR-2),0);
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; ctx.stroke();
+
+  // 허브 중심 포인트
+  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fill();
+
+  // ④ ★ 12시 빨간 마커 (회전각 직관 확인용)
+  ctx.beginPath(); ctx.arc(0,-R,6,0,Math.PI*2);
+  ctx.fillStyle='#ff2020';
+  ctx.shadowColor='rgba(255,20,20,0.9)'; ctx.shadowBlur=12;
+  ctx.fill();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1; ctx.stroke();
+
+  ctx.restore();
+  _whAngleEl.textContent=(angleDeg>=0?'+':'')+angleDeg.toFixed(0)+'°';
 }
 drawWheel(0); // 초기 렌더
 
