@@ -1,3 +1,31 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+
+# macOS
 .DS_Store
+.AppleDouble
+
+# Claude Code 내부 파일
+.claude/
+
+# Three.js 로컬 복사본 (CDN 사용 중)
+three/
+
+# 오피스 임시 잠금 파일
+~$*.docx
+~$*.pptx
+~$*.xlsx
+
+# 보고서/문서 (코드 아님)
+*.hwp
+수치자료_보고서.docx
+프로젝트_연결성_보고서.docx
+그림_자료_*.docx
+보고서_검토의견.docx
+개념도_9장.pptx
+칼만필터_수정본.pptx
+
+# 환경 변수
+.env

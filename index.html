@@ -248,8 +248,33 @@
       50%      { background:rgba(0,120,50,.22); }
     }
 
-    /* ── btn-run hidden after end state ── */
-    .btn-run.hidden { display:none; }
+    /* ── btn-run wrapper & hint arrow ── */
+    .btn-run-wrap { flex:1; position:relative; }
+    .btn-run { width:100%; }
+    /* visibility:hidden으로 공간 유지 → ↺ 버튼 위치 고정 */
+    .btn-run.hidden { visibility:hidden; pointer-events:none; }
+
+    /* 힌트 화살표 — btn-run 영역에 겹쳐 표시 */
+    .btn-hint {
+      position:absolute; inset:0;
+      display:flex; align-items:center; justify-content:flex-end;
+      padding-right:10px;
+      font-size:13px; font-weight:600;
+      color:#4a90cc; letter-spacing:.3px;
+      opacity:0; pointer-events:none;
+      transition:opacity .35s ease;
+    }
+    .btn-hint.show { opacity:1; }
+    @keyframes hintBounce {
+      0%,100% { transform:translateX(0);   opacity:.65; }
+      50%      { transform:translateX(7px); opacity:1;  }
+    }
+    /* 글자 + 화살표 전체를 하나로 묶어 같이 통통 튀게 */
+    .hint-inner {
+      display:inline-flex; align-items:center; gap:5px;
+      animation:hintBounce .75s ease-in-out infinite;
+    }
+    .hint-arrow { font-size:17px; }
 
     /* ── Viewport ──────────────────────── */
     #viewport { flex:1; position:relative; overflow:hidden; }
@@ -394,8 +419,13 @@
 
   <!-- 실행 -->
   <div class="btn-row">
-    <button class="btn btn-run" id="btn-run" onclick="toggleRun()">▶ 실행</button>
-    <button class="btn btn-rst"               onclick="resetSim()">↺</button>
+    <div class="btn-run-wrap">
+      <button class="btn btn-run" id="btn-run" onclick="toggleRun()">▶ 실행</button>
+      <div class="btn-hint" id="btn-hint">
+        <span class="hint-inner"><span>초기화 버튼</span><span class="hint-arrow">→</span></span>
+      </div>
+    </div>
+    <button class="btn btn-rst" onclick="resetSim()">↺</button>
   </div>
 
   <!-- 카메라 -->
@@ -433,8 +463,83 @@
 
   <!-- Steering wheel HUD -->
   <div id="wheel-hud">
-    <canvas id="wheel-canvas" width="140" height="140"></canvas>
-    <div class="wh-label" id="wh-angle">0°</div>
+    <svg id="wheel-canvas" viewBox="0 0 140 140" width="140" height="140" xmlns="http://www.w3.org/2000/svg" style="display:block;" overflow="visible">
+      <defs>
+        <radialGradient id="wRG" cx="50" cy="42" r="80" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#747a82"/>
+          <stop offset="26%"  stop-color="#525860"/>
+          <stop offset="56%"  stop-color="#333840"/>
+          <stop offset="82%"  stop-color="#1e2530"/>
+          <stop offset="100%" stop-color="#131720"/>
+        </radialGradient>
+        <radialGradient id="wBG" cx="52" cy="45" r="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#545a66"/>
+          <stop offset="46%"  stop-color="#3d4350"/>
+          <stop offset="100%" stop-color="#28303c"/>
+        </radialGradient>
+        <radialGradient id="wHG" cx="57" cy="53" r="34" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#5e6472"/>
+          <stop offset="33%"  stop-color="#464c5a"/>
+          <stop offset="68%"  stop-color="#323846"/>
+          <stop offset="100%" stop-color="#1e2332"/>
+        </radialGradient>
+        <radialGradient id="wHS" cx="70" cy="70" r="24" gradientUnits="userSpaceOnUse">
+          <stop offset="52%"  stop-color="rgba(0,0,0,0)"/>
+          <stop offset="100%" stop-color="rgba(0,0,0,0.5)"/>
+        </radialGradient>
+        <radialGradient id="wBtG" cx="63" cy="63" r="11" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#656c76"/>
+          <stop offset="50%"  stop-color="#3c4452"/>
+          <stop offset="100%" stop-color="#1c2232"/>
+        </radialGradient>
+        <linearGradient id="wCG" x1="60" y1="60" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="rgba(230,238,246,0.95)"/>
+          <stop offset="22%"  stop-color="rgba(150,165,180,0.82)"/>
+          <stop offset="50%"  stop-color="rgba(80,96,112,0.68)"/>
+          <stop offset="78%"  stop-color="rgba(150,165,180,0.82)"/>
+          <stop offset="100%" stop-color="rgba(225,235,244,0.93)"/>
+        </linearGradient>
+        <filter id="wDrop" x="-15%" y="-15%" width="130%" height="130%">
+          <feDropShadow dx="2" dy="3" stdDeviation="5" flood-color="#000" flood-opacity="0.80"/>
+        </filter>
+      </defs>
+      <g id="wheel-rotate" filter="url(#wDrop)">
+        <!-- ① 림 링: 외경63, 내경49, evenodd로 링 형성 -->
+        <path fill="url(#wRG)" fill-rule="evenodd"
+              d="M133,70 A63,63 0 1 1 7,70 A63,63 0 1 1 133,70Z
+                 M119,70 A49,49 0 1 1 21,70 A49,49 0 1 1 119,70Z"/>
+        <!-- 림 내측 엣지 이너섀도 -->
+        <circle cx="70" cy="70" r="50" fill="none" stroke="rgba(0,0,0,0.72)" stroke-width="3.5"/>
+        <!-- 림 상단 광택 하이라이트 (r=56, 300°→60°) -->
+        <path d="M21.5,42 A56,56 0 0 1 118.5,42"
+              fill="none" stroke="rgba(255,255,255,0.20)" stroke-width="8" stroke-linecap="butt"/>
+        <!-- 가죽 심선 300°(10시) -->
+        <line x1="27.6" y1="45.5" x2="15.4" y2="38.5" stroke="rgba(0,0,0,0.65)" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="28.8" y1="46.1" x2="16.6" y2="39.1" stroke="rgba(255,255,255,0.14)" stroke-width="1"   stroke-linecap="round"/>
+        <!-- 가죽 심선 60°(2시) -->
+        <line x1="112.4" y1="45.5" x2="124.6" y2="38.5" stroke="rgba(0,0,0,0.65)" stroke-width="2.2" stroke-linecap="round"/>
+        <line x1="111.2" y1="46.1" x2="123.4" y2="39.1" stroke="rgba(255,255,255,0.14)" stroke-width="1"   stroke-linecap="round"/>
+        <!-- ② 내부 원판 + 3개 개구부(evenodd) -->
+        <!-- 스포크: 좌=295°, 우=65°, 하=160°~200° | 허브경계r=26 -->
+        <!-- 상단 개구부: 295°→65° (130°), 하우하: 115°→160° (45°), 하좌: 200°→245° (45°) -->
+        <path fill="url(#wBG)" fill-rule="evenodd"
+              d="M119,70 A49,49 0 1 1 21,70 A49,49 0 1 1 119,70Z
+                 M25.6,49.3 A49,49 0 0 1 114.4,49.3 L93.6,59 A26,26 0 0 0 46.4,59Z
+                 M114.4,90.7 A49,49 0 0 1 86.8,116.1 L78.9,94.4 A26,26 0 0 0 93.6,81Z
+                 M53.2,116.1 A49,49 0 0 1 25.6,90.7 L46.4,81 A26,26 0 0 0 61.1,94.4Z"/>
+        <!-- ③ 허브 패드 -->
+        <circle cx="70" cy="70" r="24" fill="url(#wHG)"/>
+        <circle cx="70" cy="70" r="24" fill="url(#wHS)"/>
+        <circle cx="70" cy="70" r="24" fill="none" stroke="rgba(0,0,0,0.70)" stroke-width="1.8"/>
+        <path d="M46.1,67.9 A24,24 0 0 1 62.6,47.2"
+              fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" stroke-linecap="round"/>
+        <!-- ④ 크롬 링 -->
+        <circle cx="70" cy="70" r="10.5" fill="none" stroke="url(#wCG)" stroke-width="3.2"/>
+        <!-- ⑤ 혼 버튼 -->
+        <circle cx="70" cy="70" r="7" fill="url(#wBtG)"/>
+      </g>
+    </svg>
+    <div class="wh-label" id="wh-angle" style="display:none;">0°</div>
   </div>
 
   <!-- HUD -->
@@ -939,14 +1044,18 @@ function syncEgoCar(ts) {
 
   // ── 낭떠러지 추락 연출 ────────────────────────────────
   if(sim.falling && ts !== undefined) {
-    const ft=(ts-sim.fallStartTs)/1000;
-    const fallY = -4.9*ft*ft;                  // g/2 ≈ 4.9 m/s²
+    const ftRaw=(ts-sim.fallStartTs)/1000;
+    // 2초에 애니메이션 프리즈 — sim.falling은 유지해 카메라가 계속 따라옴
+    const ft=Math.min(ftRaw, 2.0);
+
+    const fallY=-4.9*ft*ft;                        // g/2 ≈ 4.9 m/s²
     egoCar.position.set(_rx, fallY, _rz);
-    egoCar.rotation.y = Math.PI/2+_rTheta;
-    egoCar.rotation.z = ft*1.8;                // 옆으로 굴러가는 효과
-    egoCar.rotation.x = Math.sin(ft*4)*0.6;   // 앞뒤 요동
-    // 0.4초 후 충돌 오버레이 + "추락!" 표시
-    if(ft>0.4 && !sim.crashed) {
+    egoCar.rotation.y=Math.PI/2+_rTheta;
+    egoCar.rotation.z=ft*1.8;                      // 옆으로 기울기 (t=2 → 3.6rad)
+    egoCar.rotation.x=ftRaw<2.0?Math.sin(ftRaw*4)*0.6:0; // 2초 후 요동 정지
+
+    // 0.4초 후 "추락!" 오버레이 표시 — 이후 계속 유지
+    if(ftRaw>0.4 && !sim.crashed) {
       sim.crashed=true; sim.crashTs=ts;
       EL.hCcd.textContent='추락!'; EL.hCcd.className='hv danger';
       EL.crashTxt.textContent='추락!';
@@ -981,7 +1090,7 @@ function stepCamera(dt) {
   const θ=_rTheta;
   const fx=Math.cos(θ), fz=-Math.sin(θ);
 
-  // 추락 중 카메라: 차와 함께 내려가며 아래를 내려다봄
+  // 추락 중 카메라: 차와 함께 내려가며 아래를 내려다봄 (sim.falling 유지되는 한 계속 추적)
   if(sim.falling) {
     const carY = egoCar.position.y;
     const tX=_rx-fx*10, tY=carY+7, tZ=_rz-fz*10;
@@ -1037,6 +1146,7 @@ const EL = {
   pbD:        document.getElementById('pb-d'),
   pbSum:      document.getElementById('pb-sum'),
   btnRun:        document.getElementById('btn-run'),
+  btnHint:       document.getElementById('btn-hint'),
   crashOverlay:  document.getElementById('crash-overlay'),
   crashTxt:      document.querySelector('#crash-overlay .crash-txt'),
   successOverlay:document.getElementById('success-overlay'),
@@ -1061,122 +1171,19 @@ function drawArc(spd) {
   ctx.font='9px sans-serif';ctx.fillStyle='#1f3a5a';ctx.fillText('km/h',cx,cy+1);
 }
 
-// ── Steering wheel canvas ─────────────────────
-const _wheelCanvas = document.getElementById('wheel-canvas');
-const _wheelCtx    = _wheelCanvas.getContext('2d');
+// ── Steering wheel SVG ───────────────────────
+const _wheelCanvas = document.getElementById('wheel-canvas'); // SVG element
+// _wheelCtx: not needed — SVG rotation via setAttribute
 const _whAngleEl   = document.getElementById('wh-angle');
 
 function drawWheel(angleDeg) {
-  const c=_wheelCanvas, ctx=_wheelCtx;
-  const W=c.width, H=c.height, cx=W/2, cy=H/2;
-  const R=50;           // 림 중심 반지름
-  const RW=10;          // 림 두께
-  const Ro=R+RW/2, Ri=R-RW/2;  // 림 외·내경
-  const HR=14;          // 허브 x반지름
-
-  ctx.clearRect(0,0,W,H);
-
-  // ── 고정 요소 (회전 없음) ─────────────────────────
-  ctx.save();
-  ctx.translate(cx,cy);
-  const refR=Ro+6;
-
-  // 배경 기준 원
-  ctx.beginPath(); ctx.arc(0,0,refR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1; ctx.stroke();
-
-  // 12시 고정 삼각 기준점
-  ctx.beginPath();
-  ctx.moveTo(0,-(refR+1)); ctx.lineTo(-5,-(refR+9)); ctx.lineTo(5,-(refR+9));
-  ctx.closePath();
-  ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.fill();
-
-  // 눈금 ±45°(흰), ±90°(빨강)
-  [[-90,'rgba(255,100,100,0.55)'],[-45,'rgba(255,255,255,0.2)'],
-   [45,'rgba(255,255,255,0.2)'],[90,'rgba(255,100,100,0.55)']].forEach(([deg,col])=>{
-    const a=(deg-90)*Math.PI/180;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a)*(refR+2),Math.sin(a)*(refR+2));
-    ctx.lineTo(Math.cos(a)*(refR+9),Math.sin(a)*(refR+9));
-    ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.stroke();
-  });
-  ctx.restore();
-
-  // ── 회전 요소 ────────────────────────────────────
-  ctx.save();
-  ctx.translate(cx,cy);
-  ctx.rotate(angleDeg*Math.PI/180);
-
-  // ① 림 — filled ring (실제 스티어링 휠 단면)
-  ctx.shadowColor='rgba(0,0,0,0.65)';
-  ctx.shadowBlur=14; ctx.shadowOffsetX=2; ctx.shadowOffsetY=5;
-  ctx.beginPath();
-  ctx.arc(0,0,Ro,0,Math.PI*2,false);
-  ctx.arc(0,0,Ri,0,Math.PI*2,true);
-  const rimG=ctx.createLinearGradient(-Ro,-Ro,Ro,Ro);
-  rimG.addColorStop(0,'#5a6880');
-  rimG.addColorStop(0.4,'#9aaabb');
-  rimG.addColorStop(0.7,'#3a4858');
-  rimG.addColorStop(1,'#1e2a38');
-  ctx.fillStyle=rimG; ctx.fill('evenodd');
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-
-  // 림 광택 호
-  ctx.beginPath(); ctx.arc(0,0,R,-Math.PI*0.72,-Math.PI*0.20);
-  ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=3.5; ctx.stroke();
-
-  // ② 스포크 — 사다리꼴 채우기 (Y형: 10시·2시·6시)
-  const SW_H=11, SW_R=4.5;   // 허브쪽·림쪽 반폭
-  [-Math.PI/2-Math.PI/4.5, -Math.PI/2+Math.PI/4.5, Math.PI/2].forEach(angle=>{
-    const dx=Math.cos(angle), dy=Math.sin(angle);
-    const px=-dy, py=dx;
-    const sR=HR+2;
-    ctx.beginPath();
-    ctx.moveTo(dx*sR+px*SW_H,  dy*sR+py*SW_H);
-    ctx.lineTo(dx*Ri +px*SW_R, dy*Ri +py*SW_R);
-    ctx.lineTo(dx*Ri -px*SW_R, dy*Ri -py*SW_R);
-    ctx.lineTo(dx*sR -px*SW_H, dy*sR -py*SW_H);
-    ctx.closePath();
-    const sg=ctx.createLinearGradient(dx*sR,dy*sR,dx*Ri,dy*Ri);
-    sg.addColorStop(0,'#7888a0'); sg.addColorStop(0.5,'#4a5870'); sg.addColorStop(1,'#2e3a4e');
-    ctx.fillStyle=sg; ctx.fill();
-    // 스포크 하이라이트
-    ctx.beginPath();
-    ctx.moveTo(dx*sR+px*(SW_H-2),dy*sR+py*(SW_H-2));
-    ctx.lineTo(dx*Ri+px*(SW_R-1),dy*Ri+py*(SW_R-1));
-    ctx.strokeStyle='rgba(255,255,255,0.16)'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.stroke();
-  });
-
-  // ③ 허브 패드 (에어백 커버 — 실제 핸들처럼 넓은 타원형)
-  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8;
-  ctx.beginPath(); ctx.ellipse(0,0,HR+4,HR+2,0,0,Math.PI*2);
-  const hubG=ctx.createRadialGradient(-4,-5,1,0,0,HR+4);
-  hubG.addColorStop(0,'#8898b0'); hubG.addColorStop(0.55,'#4a5870'); hubG.addColorStop(1,'#252f3e');
-  ctx.fillStyle=hubG; ctx.fill();
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-  ctx.strokeStyle='rgba(140,160,180,0.4)'; ctx.lineWidth=1.2; ctx.stroke();
-
-  // 허브 수평 버튼라인 (실제 핸들 버튼 느낌)
-  ctx.beginPath();
-  ctx.moveTo(-(HR-2),0); ctx.lineTo((HR-2),0);
-  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; ctx.stroke();
-
-  // 허브 중심 포인트
-  ctx.beginPath(); ctx.arc(0,0,3,0,Math.PI*2);
-  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.fill();
-
-  // ④ ★ 12시 빨간 마커 (회전각 직관 확인용)
-  ctx.beginPath(); ctx.arc(0,-R,6,0,Math.PI*2);
-  ctx.fillStyle='#ff2020';
-  ctx.shadowColor='rgba(255,20,20,0.9)'; ctx.shadowBlur=12;
-  ctx.fill();
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1; ctx.stroke();
-
-  ctx.restore();
-  _whAngleEl.textContent=(angleDeg>=0?'+':'')+angleDeg.toFixed(0)+'°';
+  // SVG 기반 — g#wheel-rotate 를 회전만 업데이트
+  const g = document.getElementById('wheel-rotate');
+  if (g) g.setAttribute('transform', `rotate(${angleDeg} 70 70)`);
+  if (_whAngleEl) _whAngleEl.textContent = (angleDeg>=0?'+':'')+angleDeg.toFixed(0)+'°';
 }
-drawWheel(0); // 초기 렌더
+drawWheel(0); // 초기 렌더 (SVG는 정적 — rotation 0 설정)
+let _wheelDisplayAngle = 0; // 핸들 부드럽게 보간용
 
 // ── HUD / status update ───────────────────────
 const PHASE_LABEL = { STRAIGHT:'직진', EVADE:'회피 중', PD_RETURN:'PD 복귀', LANE_RETURN:'차선 복귀', COMPLETE:'복귀 완료', IDLE:'대기' };
@@ -1235,11 +1242,24 @@ function updateUI(ts) {
 
   drawArc(spd);
 
-  // 핸들 시각화 — EVADE는 슬라이더값, 자동구간은 wheel→SW 환산
-  const wheelVisAngle = (sim.running && sim.phase !== 'EVADE' && sim.phase !== 'STRAIGHT')
-    ? Math.max(-90, Math.min(90, sim.steerCmd * STEERING_RATIO))
-    : stDeg;
-  drawWheel(wheelVisAngle);
+  // ── 핸들 시각화 — 3단계 ──────────────────────────────────
+  // 1. 정지 상태: 슬라이더 조향각에 맞춰 핸들 돌아감
+  // 2. 시뮬 시작(STRAIGHT): 핸들 0도 정렬
+  // 3. 시뮬 중 자동 제어: 차량 거동(steerCmd)에 따라 돌아감
+  let _wheelTarget;
+  if (!sim.running) {
+    _wheelTarget = stDeg;                           // ① 슬라이더 각도 그대로
+  } else if (sim.phase === 'STRAIGHT') {
+    _wheelTarget = 0;                               // ② 시뮬 시작 → 핸들 정렬
+  } else if (sim.phase === 'EVADE') {
+    _wheelTarget = stDeg;                           // 회피: 슬라이더 값(SW 각도)
+  } else {
+    // PD_RETURN / LANE_RETURN / COMPLETE: 바퀴 각도 → ×3 매핑(±30°→±90°)
+    _wheelTarget = Math.max(-90, Math.min(90, sim.steerCmd * 3.0));
+  }
+  // smooth lerp: 급격한 스냅 방지
+  _wheelDisplayAngle += (_wheelTarget - _wheelDisplayAngle) * 0.18;
+  drawWheel(_wheelDisplayAngle);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1319,7 +1339,7 @@ function animate(ts) {
           sim.phase='COMPLETE'; steerCmd=0;
           // 성공 — 시뮬 정지 + 성공 오버레이
           sim.running=false;
-          EL.btnRun.classList.add('hidden');
+          EL.btnRun.classList.add('hidden');    EL.btnHint.classList.add('show');
           EL.btnRun.classList.remove('active');
           EL.btnRun.textContent='▶ 실행';
           EL.successOverlay.classList.remove('show');
@@ -1350,7 +1370,7 @@ function animate(ts) {
         sim.running=false; sim.falling=true;
         sim.fallStartTs=performance.now();
         EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
-        EL.btnRun.classList.add('hidden'); // 초기화 버튼만 남김
+        EL.btnRun.classList.add('hidden'); EL.btnHint.classList.add('show'); // 힌트 표시
         EL.crashTxt.textContent='추락!';
         break;
       }
@@ -1360,7 +1380,7 @@ function animate(ts) {
         sim.running=false;
         sim.crashed=true; sim.crashTs=performance.now();
         EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
-        EL.btnRun.classList.add('hidden'); // 초기화 버튼만 남김
+        EL.btnRun.classList.add('hidden'); EL.btnHint.classList.add('show'); // 힌트 표시
         EL.hCcd.textContent='충돌!'; EL.hCcd.className='hv danger';
         EL.crashTxt.textContent='충돌!';
         EL.crashOverlay.classList.remove('show');
@@ -1403,6 +1423,8 @@ function animate(ts) {
   updateUI(ts);
   if(sim.camMode==='free') orbit.update();
   renderer.render(scene,camera);
+  // 스크린샷용 전역 노출
+  window._r3 = { renderer, scene, camera };
 }
 
 // ══════════════════════════════════════════════════════
@@ -1459,7 +1481,7 @@ window.toggleRun=function(){
     EL.successOverlay.classList.remove('show');
     EL.crashTxt.textContent='충돌!'; // 기본값 복원
     EL.hCcd.textContent='안전'; EL.hCcd.className='hv safe';
-    EL.btnRun.classList.remove('hidden');
+    EL.btnRun.classList.remove('hidden'); EL.btnHint.classList.remove('show');
     evadeMarker.visible = false;       // 실행 중 마커 숨김
     evadeMarkerLine.visible = false;
     rebuildTrajectory(); // Run 클릭 순간에만 궤적 생성
@@ -1479,9 +1501,10 @@ window.resetSim=function(){
   egoModel=new KinematicBicycleModel(0,0,Math.PI/2,getV('s-speed')/3.6,WHEELBASE);
   _rx=egoModel.x; _rz=egoModel.z; _rTheta=egoModel.theta; // 렌더 상태 동기화
   egoCar.rotation.z=0; egoCar.rotation.x=0; egoCar.position.y=0;
+  _wheelDisplayAngle=getV('s-steer'); // 핸들 보간 변수 슬라이더 값으로 초기화
   ccdLine.visible=false;
   EL.btnRun.textContent='▶ 실행'; EL.btnRun.classList.remove('active');
-  EL.btnRun.classList.remove('hidden'); // 실행 버튼 복원
+  EL.btnRun.classList.remove('hidden'); EL.btnHint.classList.remove('show'); // 힌트 숨김
   EL.crashOverlay.classList.remove('show');
   EL.successOverlay.classList.remove('show');
   EL.crashTxt.textContent='충돌!'; // 기본값 복원
