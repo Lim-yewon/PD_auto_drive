@@ -9,7 +9,8 @@
 
 ## 데모
 
-![시뮬레이터 전체 UI](figures/VI-1_simulator_full.png)
+<img width="3420" height="1970" alt="그림11  Three js 3D 가시화 및 통합 모니터링 UI 화면" src="https://github.com/user-attachments/assets/9c301e5b-a434-41a6-a5c9-969dcad66fd8" />
+
 
 브라우저에서 `index.html`을 열면 바로 실행됩니다. 별도 설치 불필요.
 
